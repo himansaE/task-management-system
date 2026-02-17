@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateTaskInput, TaskStatus, UpdateTaskInput } from '@repo/contract';
 import { tasks } from '@repo/database';
 import { randomUUID } from 'node:crypto';
@@ -10,7 +14,9 @@ export class TasksService {
   private readonly tasksById = new Map<string, TaskRecord>();
 
   list(userId: string) {
-    return Array.from(this.tasksById.values()).filter((task) => task.ownerId === userId);
+    return Array.from(this.tasksById.values()).filter(
+      (task) => task.ownerId === userId,
+    );
   }
 
   create(userId: string, input: CreateTaskInput) {
@@ -47,9 +53,17 @@ export class TasksService {
     const nextTask: TaskRecord = {
       ...existing,
       title: input.title ?? existing.title,
-      description: input.description === undefined ? existing.description : (input.description ?? null),
+      description:
+        input.description === undefined
+          ? existing.description
+          : (input.description ?? null),
       priority: input.priority ?? existing.priority,
-      dueDate: input.dueDate === undefined ? existing.dueDate : (input.dueDate ? new Date(input.dueDate) : null),
+      dueDate:
+        input.dueDate === undefined
+          ? existing.dueDate
+          : input.dueDate
+            ? new Date(input.dueDate)
+            : null,
       updatedAt: new Date(),
     };
 

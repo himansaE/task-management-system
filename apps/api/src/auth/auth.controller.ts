@@ -1,4 +1,10 @@
-import { Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  Post,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { loginSchema, registerSchema } from '@repo/contract';
 import { CurrentUserId } from '../common/request-user.decorator';
 import { parseWithZod } from '../common/zod-parse';

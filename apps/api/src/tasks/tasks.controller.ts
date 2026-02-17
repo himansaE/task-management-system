@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { createTaskSchema, updateTaskSchema } from '@repo/contract';
 import { CurrentUserId } from '../common/request-user.decorator';
 import { parseWithZod } from '../common/zod-parse';
@@ -20,7 +28,11 @@ export class TasksController {
   }
 
   @Put(':id')
-  update(@CurrentUserId() userId: string, @Param('id') taskId: string, @Body() body: unknown) {
+  update(
+    @CurrentUserId() userId: string,
+    @Param('id') taskId: string,
+    @Body() body: unknown,
+  ) {
     const payload = parseWithZod(updateTaskSchema, body);
     return this.tasksService.update(userId, taskId, payload);
   }

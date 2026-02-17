@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { LoginInput, RegisterInput } from '@repo/contract';
 import { users } from '@repo/database';
 import { createHash, randomUUID } from 'node:crypto';

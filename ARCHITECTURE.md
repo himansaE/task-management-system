@@ -115,7 +115,7 @@ users.token_version: INTEGER DEFAULT 0
 
 ### 3.4 CSRF Protection Strategy
 
-With `SameSite=Strict` cookies, CSRF via cross-origin form submissions is blocked at the browser level. As an additional defense, the `JwtAuthGuard` validates the `Origin` header on state-changing requests (`POST`, `PUT`, `DELETE`) against a whitelist of allowed origins. This double-layer approach avoids the complexity of CSRF tokens while maintaining security.
+With `SameSite=Strict` cookies, CSRF via cross-origin form submissions is blocked at the browser level. As an additional defense, the `JwtAuthGuard` validates the `Origin` header on state-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) against a whitelist of allowed origins. This double-layer approach avoids the complexity of CSRF tokens while maintaining security.
 
 ---
 
@@ -197,11 +197,7 @@ Every API response follows a predictable shape. The frontend never needs to gues
 | `PUT` | `/tasks/:id` | Cookie | Update task. Ownership enforced (`WHERE id = $1 AND user_id = $2`). |
 | `DELETE` | `/tasks/:id` | Cookie | Delete task. Ownership enforced. Returns `204 No Content`. |
 
-### 5.3 API Versioning
-
-URI-based versioning: `/api/v1/tasks`. Implemented via NestJS `VersioningType.URI`. Allows future breaking changes without disrupting existing clients.
-
-### 5.4 Possible Use Cases
+### 5.3 Possible Use Cases
 
 ```mermaid
 flowchart LR

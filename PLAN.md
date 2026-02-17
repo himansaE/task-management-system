@@ -2,7 +2,7 @@
 
 Author: Associate Software Engineer Candidate  
 Date: February 2026  
-Assessment: Twist Digital (Phase 1)
+Assessment: Twist Digital (Phase 1–3)
 
 ## 1) Backend Choice and Justification
 
@@ -50,3 +50,29 @@ UI uses shadcn/ui components with Tailwind token-based styling and a CSS-variabl
 - CI/CD: GitHub Actions for lint, type-check, build, and path-based deploy triggers.
 
 This plan prioritizes secure defaults, clear module boundaries, and pragmatic production-readiness while staying aligned with the assessment scope and timeline.
+
+## 5) Phase Plan 
+
+**Phase 1 — Planning **
+- Backend choice and rationale completed.
+- Architecture and security strategy defined.
+- Better-tech choices justified (NestJS + Drizzle + Supabase, shadcn + Tailwind).
+
+**Phase 2 — Implementation & Deployment**
+- Frontend: Register/Login, dashboard, task create/edit, loading/error states, route protection.
+- Backend: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `GET/POST/PUT/DELETE /tasks`.
+- Security: password hashing, validation/sanitization, rate limiting, secure token storage, ownership enforcement, safe error handling.
+- Deployment: live frontend + backend + DB with CI quality gate.
+
+**Phase 3 — Review & Walkthrough**
+- Code walkthrough with architecture and tradeoff explanations.
+- Demonstrate deployed app and key security controls.
+- Explain decisions clearly against rubric (Security, Code Quality, UI/UX, Deployment, Soft Skills).
+
+## 6) Definition of Done 
+
+- All required endpoints implemented and tested.
+- Users can only access and modify their own tasks.
+- Auth token is stored securely in HttpOnly cookie with revocation support.
+- Frontend UX includes validation, loading/error handling, and responsive/accessibility basics.
+- Repository includes: clear commit history, `PLAN.md`, `README.md`, `.env.example`, and live URL.

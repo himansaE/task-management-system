@@ -65,3 +65,27 @@ Why this default:
 
 - Planning: [PLAN.md](PLAN.md)
 - Architecture: [ARCHITECTURE.md](ARCHITECTURE.md)
+
+## Assessment Traceability
+
+### Phase 1 — Planning
+- Backend choice and justification: [PLAN.md](PLAN.md)
+- Architecture and security planning: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md)
+
+### Phase 2 — Implementation & Deployment 
+- Frontend: login/register, dashboard, task create/edit, loading/error states, route protection
+- Backend endpoints:
+   - `POST /auth/register`
+   - `POST /auth/login`
+   - `POST /auth/refresh`
+   - `GET /tasks`
+   - `POST /tasks`
+   - `PUT /tasks/:id`
+   - `DELETE /tasks/:id`
+- Security: secure token storage, password hashing, rate limiting, validation/sanitization, authorization by ownership, safe error handling
+- Deployment: frontend + backend + database + CI quality gate
+
+### Phase 3 — Review
+- Explain architecture decisions, trade-offs, and scaling considerations
+- Demonstrate live deployment and key security decisions
+- Walk through code organization and ownership boundaries

@@ -1,17 +1,26 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { CreateTaskInput, UpdateTaskInput } from '@repo/contract';
+  CreateTaskInput,
+  ListTasksQueryInput,
+  UpdateTaskInput,
+} from '@repo/contract';
 import { TaskRecord, TasksRepository } from './tasks.repository';
 
 @Injectable()
 export class TasksService {
   constructor(private readonly tasksRepository: TasksRepository) {}
 
-  async list(userId: string) {
-    return this.tasksRepository.listByOwnerId(userId);
+  async list(userId: string, query: ListTasksQueryInput) {
+    const result = await this.tasksRepository.listByOwnerId(userId, query);
+
+    return {
+      data: result.items,
+      meta: {
+        page: query.page,
+        limit: query.limit,
+        total: result.total,
+      },
+    };
   }
 
   async create(userId: string, input: CreateTaskInput) {
@@ -20,36 +29,30 @@ export class TasksService {
       title: input.title,
       description: input.description ?? null,
       priority: input.priority,
+      status: input.status,
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
     });
   }
 
   async update(userId: string, taskId: string, input: UpdateTaskInput) {
-    const existing = await this.tasksRepository.findById(taskId);
-
-    if (!existing) {
-      throw new NotFoundException('Task not found');
-    }
-
-    if (existing.ownerId !== userId) {
-      throw new ForbiddenException('Task does not belong to user');
-    }
-
-    const updated = await this.tasksRepository.updateById(taskId, {
-      title: input.title ?? existing.title,
-      description:
-        input.description === undefined
-          ? existing.description
-          : (input.description ?? null),
-      priority: input.priority ?? existing.priority,
-      dueDate:
-        input.dueDate === undefined
-          ? existing.dueDate
-          : input.dueDate
-            ? new Date(input.dueDate)
-            : null,
-      updatedAt: new Date(),
-    });
+    const updated = await this.tasksRepository.updateByIdForOwner(
+      userId,
+      taskId,
+      {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.description !== undefined
+          ? { description: input.description ?? null }
+          : {}),
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.dueDate !== undefined
+          ? {
+              dueDate: input.dueDate ? new Date(input.dueDate) : null,
+            }
+          : {}),
+        updatedAt: new Date(),
+      },
+    );
 
     if (!updated) {
       throw new NotFoundException('Task not found');
@@ -59,17 +62,14 @@ export class TasksService {
   }
 
   async remove(userId: string, taskId: string) {
-    const existing = await this.tasksRepository.findById(taskId);
+    const deleted = await this.tasksRepository.deleteByIdForOwner(
+      userId,
+      taskId,
+    );
 
-    if (!existing) {
+    if (!deleted) {
       throw new NotFoundException('Task not found');
     }
-
-    if (existing.ownerId !== userId) {
-      throw new ForbiddenException('Task does not belong to user');
-    }
-
-    await this.tasksRepository.deleteById(taskId);
 
     return { ok: true };
   }

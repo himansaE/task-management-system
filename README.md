@@ -4,7 +4,7 @@ Associate Software Engineer assessment.
 
 ## Stack
 
-- Frontend: Next.js (App Router), Tailwind CSS, shadcn/ui, TanStack Query, Axios
+- Frontend (planned / deferred in current phase): Next.js (App Router), Tailwind CSS, shadcn/ui, TanStack Query, Axios
 - Backend: NestJS (Express), Drizzle ORM
 - Database: PostgreSQL (Supabase)
 - Monorepo: Turborepo + pnpm
@@ -38,8 +38,15 @@ Associate Software Engineer assessment.
 ## API Health Endpoint
 
 - `GET /health/db` — checks DB connectivity and returns:
-  - `200 {"status":"ok"}` when database is reachable
+   - `200 {"data":{"status":"ok"}}` when database is reachable
   - `503` when database is unavailable
+
+## Current Implementation Status (February 2026)
+
+- Backend is implemented for auth + task CRUD with secure cookie auth, token versioning, and ownership checks.
+- API success responses use a standardized envelope: `{"data": ...}` and list endpoints include `meta`.
+- `GET /tasks` supports `status`, `priority`, `page`, and `limit` query parameters.
+- Frontend in `apps/web` is deferred for the current phase and not yet feature-complete.
 
 ## API Documentation
 
@@ -91,11 +98,13 @@ Why this default:
 - Architecture and security planning: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ### Phase 2 — Implementation & Deployment 
-- Frontend: login/register, dashboard, task create/edit, loading/error states, route protection
+- Frontend: deferred in current phase (planned: login/register, dashboard, task create/edit, loading/error states, route protection)
 - Backend endpoints:
    - `POST /auth/register`
    - `POST /auth/login`
    - `POST /auth/refresh`
+   - `POST /auth/logout`
+   - `POST /auth/revoke`
    - `GET /tasks`
    - `POST /tasks`
    - `PUT /tasks/:id`

@@ -59,10 +59,10 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - Better-tech choices justified (NestJS + Drizzle + Supabase, shadcn + Tailwind).
 
 **Phase 2 — Implementation & Deployment**
-- Frontend: Register/Login, dashboard, task create/edit, loading/error states, route protection.
-- Backend: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `GET/POST/PUT/DELETE /tasks`.
+- Frontend: deferred in current phase (planned: Register/Login, dashboard, task create/edit, loading/error states, route protection).
+- Backend: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/revoke`, `GET/POST/PUT/DELETE /tasks`.
 - Security: password hashing, validation/sanitization, rate limiting, secure token storage, ownership enforcement, safe error handling.
-- Deployment: live frontend + backend + DB with CI quality gate.
+- Deployment: backend + DB active; frontend deployment follows frontend implementation phase.
 
 ### Phase 2 Progress Notes (Current)
 
@@ -71,6 +71,11 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - Added API DB health endpoint (`GET /health/db`).
 - Refined architecture boundary: shared database package provides schema/client primitives; API owns feature repositories via Nest DI.
 - Standardized environment loading for local and hosted environments using `DATABASE_URL` with local `.env` fallback.
+- Standardized API success envelopes to `{ data }` and `{ data, meta }` for paginated task lists.
+- Added task list query support: `status`, `priority`, `page`, `limit`.
+- Added task `status` support to create/update payloads.
+- Enforced owner-scoped update/delete directly at query level.
+- Updated logout flow to revoke sessions via token version increment and clear auth cookies.
 
 **Phase 3 — Review & Walkthrough**
 - Code walkthrough with architecture and tradeoff explanations.
@@ -82,5 +87,5 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - All required endpoints implemented.
 - Users can only access and modify their own tasks.
 - Auth token is stored securely in HttpOnly cookie with revocation support.
-- Frontend UX includes validation, loading/error handling, and responsive/accessibility basics.
+- Frontend UX is deferred to the next phase.
 - Repository includes: clear commit history, `PLAN.md`, `README.md`, `.env.example`, and live URL.

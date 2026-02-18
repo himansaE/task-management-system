@@ -14,6 +14,9 @@ export class CreateTaskRequestDto {
   @ApiProperty({ enum: ['LOW', 'MEDIUM', 'HIGH'], default: 'MEDIUM' })
   priority!: 'LOW' | 'MEDIUM' | 'HIGH';
 
+  @ApiProperty({ enum: ['TODO', 'IN_PROGRESS', 'DONE'], default: 'TODO' })
+  status!: 'TODO' | 'IN_PROGRESS' | 'DONE';
+
   @ApiProperty({ required: false, type: String, format: 'date-time' })
   dueDate?: string;
 }

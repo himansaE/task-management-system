@@ -6,6 +6,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { users } from '@repo/database';
+import { ApiErrorResponseDto } from './common/dto/api-error-response.dto';
 import { AppService } from './app.service';
 import { DatabaseService } from './database/database.service';
 
@@ -18,10 +19,17 @@ export class AppController {
   ) {}
 
   @ApiOperation({ summary: 'Hello endpoint' })
-  @ApiOkResponse({ schema: { type: 'string', example: 'Hello World!' } })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', example: 'Hello World!' },
+      },
+    },
+  })
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  getHello() {
+    return { data: this.appService.getHello() };
   }
 
   @ApiOperation({ summary: 'Database health check' })
@@ -29,11 +37,19 @@ export class AppController {
     schema: {
       type: 'object',
       properties: {
-        status: { type: 'string', example: 'ok' },
+        data: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', example: 'ok' },
+          },
+        },
       },
     },
   })
-  @ApiServiceUnavailableResponse({ description: 'Database unavailable' })
+  @ApiServiceUnavailableResponse({
+    description: 'Database unavailable',
+    type: ApiErrorResponseDto,
+  })
   @Get('health/db')
   async getDatabaseHealth() {
     try {
@@ -42,9 +58,7 @@ export class AppController {
         .from(users)
         .limit(1);
 
-      return {
-        status: 'ok',
-      };
+      return { data: { status: 'ok' } };
     } catch {
       throw new ServiceUnavailableException('Database unavailable');
     }

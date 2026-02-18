@@ -2,6 +2,8 @@
 
 > Internal reference document. Not a deliverable — complements the 1-page [PLAN.md](PLAN.md).
 
+> Implementation status (February 2026): backend is active; frontend work is intentionally deferred to the next phase.
+
 ---
 
 ## 1. System Architecture
@@ -41,7 +43,7 @@ flowchart LR
 | Layer | Technology | Why This Over Alternatives |
 |---|---|---|
 | **Monorepo** | Turborepo + pnpm | Cached builds, shared `tsconfig`/`eslint`, strict package boundaries. pnpm's strict node_modules prevents phantom deps. |
-| **Frontend** | Next.js 14 (App Router) | Assessment requirement. RSC for SEO/perf, Middleware for edge auth checks, Server Actions for non-interactive posts. |
+| **Frontend** | Next.js 14 (App Router) | Planned target for the frontend phase. Current codebase keeps backend-first delivery and defers full frontend feature implementation. |
 | **UI** | Tailwind CSS + Shadcn/ui | shadcn component primitives with Tailwind token-based styling. Theme values come from semantic CSS variables and are switched by a theme provider for correct light/dark modes without hardcoded colors. |
 | **HTTP Client** | Axios | Response interceptors enable global 401 handling (auto-redirect to login) and consistent error mapping. `credentials: 'include'` auto-sends cookies. `fetch` lacks interceptors without wrapper boilerplate. |
 | **State Mgmt** | TanStack Query | Server-state solution: handles `isLoading`, `isError`, `data`, cache invalidation, and optimistic updates. Dehydrate/hydrate pattern enables SSR → client handoff with zero loading flicker. Replaces manual `useEffect` patterns. |
@@ -191,11 +193,11 @@ Every API response follows a predictable shape. The frontend never needs to gues
 | `POST` | `/auth/register` | Public | Create account and issue auth cookies. Returns user payload. |
 | `POST` | `/auth/login` | Public | Validate credentials → Set HttpOnly cookie (JWT). |
 | `POST` | `/auth/refresh` | Cookie | Reissue JWT with fresh expiry. Checks `token_version`. |
-| `POST` | `/auth/logout` | Cookie | Clear cookie. Optionally increment `token_version`. |
+| `POST` | `/auth/logout` | Cookie | Revoke current session by incrementing `token_version`, then clear auth cookies. |
 | `GET` | `/tasks` | Cookie | List authenticated user's tasks. Supports `?status=&priority=&page=&limit=`. |
-| `POST` | `/tasks` | Cookie | Create task. Title required, status defaults to `TODO`. |
+| `POST` | `/tasks` | Cookie | Create task. Title required; `status` supported and defaults to `TODO`. |
 | `PUT` | `/tasks/:id` | Cookie | Update task. Ownership enforced (`WHERE id = $1 AND user_id = $2`). |
-| `DELETE` | `/tasks/:id` | Cookie | Delete task. Ownership enforced. Returns `{ ok: true }`. |
+| `DELETE` | `/tasks/:id` | Cookie | Delete task. Ownership enforced. Returns `{ "data": { "ok": true } }`. |
 
 ### 5.3 Possible Use Cases
 
@@ -373,7 +375,7 @@ pnpm dev  # Turborepo runs apps/web + apps/api concurrently
 
 ### 8.4 Health Check
 
-`GET /health/db` — Returns `{ status: 'ok' }` when database connectivity works, and `503` when unavailable.
+`GET /health/db` — Returns `{ data: { status: 'ok' } }` when database connectivity works, and `503` when unavailable.
 
 ---
 

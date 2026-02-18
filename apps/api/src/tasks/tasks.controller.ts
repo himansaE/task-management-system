@@ -5,27 +5,37 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Put,
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBody,
   ApiCookieAuth,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { createTaskSchema, updateTaskSchema } from '@repo/contract';
+import {
+  createTaskSchema,
+  listTasksQuerySchema,
+  updateTaskSchema,
+} from '@repo/contract';
+import { ApiErrorResponseDto } from '../common/dto/api-error-response.dto';
 import { CurrentUserId } from '../common/request-user.decorator';
 import { OkResponseDto } from '../common/dto/ok-response.dto';
 import { parseWithZod } from '../common/zod-parse';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateTaskRequestDto } from './dto/create-task-request.dto';
-import { TaskDto } from './dto/task.dto';
+import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
+import { TaskListResponseDto, TaskResponseDto } from './dto/task-response.dto';
 import { UpdateTaskRequestDto } from './dto/update-task-request.dto';
 import { TasksService } from './tasks.service';
 
@@ -38,48 +48,123 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @ApiOperation({ summary: 'List authenticated user tasks' })
-  @ApiOkResponse({ type: TaskDto, isArray: true })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['TODO', 'IN_PROGRESS', 'DONE'],
+  })
+  @ApiQuery({
+    name: 'priority',
+    required: false,
+    enum: ['LOW', 'MEDIUM', 'HIGH'],
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiOkResponse({ type: TaskListResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Invalid query parameters',
+    type: ApiErrorResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: ApiErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'Too many requests',
+    type: ApiErrorResponseDto,
+  })
   @Get()
-  list(@CurrentUserId() userId: string) {
-    return this.tasksService.list(userId);
+  async list(
+    @CurrentUserId() userId: string,
+    @Query() query: ListTasksQueryDto,
+  ) {
+    const payload = parseWithZod(listTasksQuerySchema, query);
+    return this.tasksService.list(userId, payload);
   }
 
   @ApiOperation({ summary: 'Create a task' })
   @ApiBody({ type: CreateTaskRequestDto })
-  @ApiOkResponse({ type: TaskDto })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
+  @ApiOkResponse({ type: TaskResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Invalid request payload',
+    type: ApiErrorResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: ApiErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'Too many requests',
+    type: ApiErrorResponseDto,
+  })
   @Post()
-  create(@CurrentUserId() userId: string, @Body() body: unknown) {
+  async create(@CurrentUserId() userId: string, @Body() body: unknown) {
     const payload = parseWithZod(createTaskSchema, body);
-    return this.tasksService.create(userId, payload);
+    const task = await this.tasksService.create(userId, payload);
+    return { data: task };
   }
 
   @ApiOperation({ summary: 'Update a task' })
   @ApiParam({ name: 'id', description: 'Task ID', format: 'uuid' })
   @ApiBody({ type: UpdateTaskRequestDto })
-  @ApiOkResponse({ type: TaskDto })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
+  @ApiOkResponse({ type: TaskResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Invalid request payload',
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'Task not found',
+    type: ApiErrorResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: ApiErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'Too many requests',
+    type: ApiErrorResponseDto,
+  })
   @Put(':id')
-  update(
+  async update(
     @CurrentUserId() userId: string,
     @Param('id') taskId: string,
     @Body() body: unknown,
   ) {
     const payload = parseWithZod(updateTaskSchema, body);
-    return this.tasksService.update(userId, taskId, payload);
+    const task = await this.tasksService.update(userId, taskId, payload);
+    return { data: task };
   }
 
   @ApiOperation({ summary: 'Delete a task' })
   @ApiParam({ name: 'id', description: 'Task ID', format: 'uuid' })
-  @ApiOkResponse({ type: OkResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            ok: { type: 'boolean', example: true },
+          },
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    description: 'Task not found',
+    type: ApiErrorResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: ApiErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'Too many requests',
+    type: ApiErrorResponseDto,
+  })
   @Delete(':id')
-  remove(@CurrentUserId() userId: string, @Param('id') taskId: string) {
-    return this.tasksService.remove(userId, taskId);
+  async remove(@CurrentUserId() userId: string, @Param('id') taskId: string) {
+    const result = await this.tasksService.remove(userId, taskId);
+    return { data: result as OkResponseDto };
   }
 }

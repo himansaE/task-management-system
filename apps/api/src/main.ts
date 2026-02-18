@@ -6,6 +6,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 const envCandidates = [
   resolve(process.cwd(), '.env'),
@@ -59,6 +60,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   app.enableCors({
     origin: true,

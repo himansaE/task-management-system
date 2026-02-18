@@ -20,6 +20,7 @@ import { Separator } from "@ui/separator";
 import { Skeleton } from "@ui/skeleton";
 import { useAuthStore } from "@lib/auth/auth-store";
 import { useRouteAuthGuard } from "@lib/auth/use-route-auth-guard";
+import { NetworkError } from "@components/network-error";
 
 const themes = [
   { value: "light", label: "Light", icon: Sun },
@@ -30,7 +31,8 @@ const themes = [
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { isLoading, canAccess } = useRouteAuthGuard("protected");
+  const { isLoading, canAccess, isError, error, retryAuth } =
+    useRouteAuthGuard("protected");
   const user = useAuthStore((state) => state.user);
   const revokeAllAction = useAuthStore((state) => state.revokeAllAction);
   const [isRevoking, setIsRevoking] = useState(false);
@@ -54,6 +56,10 @@ export default function SettingsPage() {
         </div>
       </div>
     );
+  }
+
+  if (isError) {
+    return <NetworkError message={error} onRetry={retryAuth} />;
   }
 
   if (!canAccess) {

@@ -1,5 +1,7 @@
 import { create } from "zustand";
+import axios from "axios";
 import {
+  getCurrentSessionUser,
   login,
   logoutSession,
   refreshSession,
@@ -14,7 +16,8 @@ type AuthStatus =
   | "unknown"
   | "refreshing"
   | "authenticated"
-  | "unauthenticated";
+  | "unauthenticated"
+  | "error";
 
 type Credentials = {
   email: string;
@@ -47,6 +50,30 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ status: "refreshing", error: null });
 
     try {
+      const user = await getCurrentSessionUser();
+      set({
+        status: "authenticated",
+        user,
+        isBootstrapped: true,
+        error: null,
+      });
+      return;
+    } catch (error) {
+      const isUnauthorized =
+        axios.isAxiosError(error) && error.response?.status === 401;
+
+      if (!isUnauthorized) {
+        set({
+          status: "error",
+          user: null,
+          isBootstrapped: true,
+          error: "Network issue. Please refresh and try again.",
+        });
+        return;
+      }
+    }
+
+    try {
       const user = await refreshSession();
       set({
         status: "authenticated",
@@ -54,12 +81,25 @@ export const useAuthStore = create<AuthState>((set) => ({
         isBootstrapped: true,
         error: null,
       });
-    } catch {
+    } catch (error) {
+      const isUnauthorized =
+        axios.isAxiosError(error) && error.response?.status === 401;
+
+      if (isUnauthorized) {
+        set({
+          status: "unauthenticated",
+          user: null,
+          isBootstrapped: true,
+          error: null,
+        });
+        return;
+      }
+
       set({
-        status: "unauthenticated",
+        status: "error",
         user: null,
         isBootstrapped: true,
-        error: null,
+        error: "Network issue. Please refresh and try again.",
       });
     }
   },

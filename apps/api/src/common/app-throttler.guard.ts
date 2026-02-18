@@ -21,30 +21,6 @@ export class AppThrottlerGuard extends ThrottlerGuard {
       return authenticatedUser;
     }
 
-    const accessToken = request.cookies?.access_token as string | undefined;
-
-    if (!accessToken) {
-      return 'anon';
-    }
-
-    const payloadSegment = accessToken.split('.')[1];
-
-    if (!payloadSegment) {
-      return 'anon';
-    }
-
-    try {
-      const parsedPayload = JSON.parse(
-        Buffer.from(payloadSegment, 'base64url').toString('utf8'),
-      ) as { sub?: string };
-
-      if (parsedPayload.sub && parsedPayload.sub.trim().length > 0) {
-        return parsedPayload.sub;
-      }
-    } catch {
-      return 'anon';
-    }
-
     return 'anon';
   }
 }

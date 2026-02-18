@@ -59,12 +59,13 @@ export function TaskRow({
       {/* Status indicator dot */}
       <div className="mt-1.5 shrink-0">
         <div
-          className={`size-2.5 rounded-full ${task.status === "DONE"
+          className={`size-2.5 rounded-full ${
+            task.status === "DONE"
               ? "bg-emerald-500"
               : task.status === "IN_PROGRESS"
                 ? "bg-blue-500"
                 : "bg-border"
-            }`}
+          }`}
         />
       </div>
 
@@ -72,8 +73,9 @@ export function TaskRow({
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex items-start justify-between gap-2">
           <p
-            className={`text-sm font-medium leading-snug ${task.status === "DONE" ? "line-through text-muted-foreground" : ""
-              }`}
+            className={`text-sm font-medium leading-snug ${
+              task.status === "DONE" ? "line-through text-muted-foreground" : ""
+            }`}
           >
             {task.title}
           </p>
@@ -160,10 +162,11 @@ export function TaskRow({
 
           {dueInfo && (
             <span
-              className={`inline-flex items-center gap-1 text-[10px] ${dueInfo.overdue && task.status !== "DONE"
+              className={`inline-flex items-center gap-1 text-[10px] ${
+                dueInfo.overdue && task.status !== "DONE"
                   ? "text-destructive font-medium"
                   : "text-muted-foreground"
-                }`}
+              }`}
             >
               <Calendar className="size-2.5" />
               {dueInfo.text}

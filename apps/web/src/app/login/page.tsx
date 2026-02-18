@@ -16,10 +16,12 @@ import { Label } from "@ui/label";
 import { Skeleton } from "@ui/skeleton";
 import { useAuthStore } from "@lib/auth/auth-store";
 import { useRouteAuthGuard } from "@lib/auth/use-route-auth-guard";
+import { NetworkError } from "@components/network-error";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isLoading, canAccess } = useRouteAuthGuard("guest");
+  const { isLoading, canAccess, isError, error, retryAuth } =
+    useRouteAuthGuard("guest");
   const loginAction = useAuthStore((state) => state.loginAction);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -58,6 +60,10 @@ export default function LoginPage() {
         </div>
       </div>
     );
+  }
+
+  if (isError) {
+    return <NetworkError message={error} onRetry={retryAuth} fill="full" />;
   }
 
   if (!canAccess) {

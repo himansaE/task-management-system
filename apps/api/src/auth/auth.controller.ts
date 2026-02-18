@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -181,6 +182,35 @@ export class AuthController {
     this.applyAuthCookies(response, result.accessToken, result.refreshToken);
 
     return { data: { user: result.user } };
+  }
+
+  @ApiOperation({ summary: 'Get current authenticated user from access token' })
+  @ApiCookieAuth('accessToken')
+  @ApiOkResponse({ type: AuthUserEnvelopeResponseDto })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: ApiErrorResponseDto,
+  })
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  getCurrentUser(@Req() request: Request) {
+    const user = request.user as
+      | { sub: string; email: string; name: string }
+      | undefined;
+
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    return {
+      data: {
+        user: {
+          id: user.sub,
+          email: user.email,
+          name: user.name,
+        },
+      },
+    };
   }
 
   @ApiOperation({ summary: 'Logout current session' })

@@ -36,6 +36,12 @@ export async function refreshSession() {
   return response.data.data.user;
 }
 
+export async function getCurrentSessionUser() {
+  const response =
+    await apiClient.get<ApiEnvelope<AuthUserResponse>>("/auth/me");
+  return response.data.data.user;
+}
+
 export async function logoutSession() {
   await apiClient.post<ApiEnvelope<{ ok: boolean }>>("/auth/logout");
 }

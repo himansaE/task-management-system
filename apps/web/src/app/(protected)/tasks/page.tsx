@@ -13,6 +13,7 @@ import {
   useUpdateTaskMutation,
 } from "@lib/query/tasks-hooks";
 import { useRouteAuthGuard } from "@lib/auth/use-route-auth-guard";
+import { NetworkError } from "@components/network-error";
 import { Task } from "@lib/api/types";
 import {
   ResponsiveDialog,
@@ -26,7 +27,7 @@ import {
 } from "@components/tasks";
 
 export default function TasksPage() {
-  const { isLoading, isAuthenticated, canAccess } =
+  const { isLoading, isAuthenticated, canAccess, isError, error, retryAuth } =
     useRouteAuthGuard("protected");
 
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "ALL">("ALL");
@@ -132,6 +133,10 @@ export default function TasksPage() {
         </div>
       </div>
     );
+  }
+
+  if (isError) {
+    return <NetworkError message={error} onRetry={retryAuth} />;
   }
 
   if (!canAccess) {

@@ -4,10 +4,18 @@ export const REFRESH_TOKEN_COOKIE = 'refresh_token';
 export const ACCESS_TOKEN_TTL_SECONDS = 60 * 15;
 export const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 
-export const ACCESS_TOKEN_SECRET =
-  process.env.JWT_ACCESS_SECRET ?? 'dev_access_secret_change_me';
-export const REFRESH_TOKEN_SECRET =
-  process.env.JWT_REFRESH_SECRET ?? 'dev_refresh_secret_change_me';
+function requireEnv(name: 'JWT_ACCESS_SECRET' | 'JWT_REFRESH_SECRET') {
+  const value = process.env[name];
+
+  if (!value || value.trim().length === 0) {
+    throw new Error(`${name} is required`);
+  }
+
+  return value;
+}
+
+export const ACCESS_TOKEN_SECRET = requireEnv('JWT_ACCESS_SECRET');
+export const REFRESH_TOKEN_SECRET = requireEnv('JWT_REFRESH_SECRET');
 
 export type JwtTokenPayload = {
   sub: string;

@@ -9,11 +9,14 @@ type RouteAuthMode = "protected" | "guest";
 export function useRouteAuthGuard(mode: RouteAuthMode) {
   const router = useRouter();
   const status = useAuthStore((state) => state.status);
+  const error = useAuthStore((state) => state.error);
+  const retryAuth = useAuthStore((state) => state.bootstrap);
   const isBootstrapped = useAuthStore((state) => state.isBootstrapped);
 
   const isLoading =
     !isBootstrapped || status === "refreshing" || status === "unknown";
   const isAuthenticated = isBootstrapped && status === "authenticated";
+  const isError = status === "error";
 
   useEffect(() => {
     if (!isBootstrapped) return;
@@ -29,6 +32,7 @@ export function useRouteAuthGuard(mode: RouteAuthMode) {
 
   const canAccess =
     !isLoading &&
+    !isError &&
     ((mode === "protected" && status === "authenticated") ||
       (mode === "guest" && status === "unauthenticated"));
 
@@ -36,5 +40,8 @@ export function useRouteAuthGuard(mode: RouteAuthMode) {
     isLoading,
     isAuthenticated,
     canAccess,
+    isError,
+    error,
+    retryAuth,
   };
 }

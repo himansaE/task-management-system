@@ -11,6 +11,6 @@ export const REFRESH_TOKEN_SECRET =
 
 export type JwtTokenPayload = {
   sub: string;
-  v: number;
+  sid: string;
   typ: 'access' | 'refresh';
 };

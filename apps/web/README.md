@@ -1,20 +1,17 @@
-# Web App (Deferred Phase)
+# Web App
 
 This package contains the Next.js frontend for the task management system.
 
 ## Current Status (February 2026)
 
-- Frontend feature work is deferred in the current implementation phase.
-- Backend API and shared contract are being delivered first.
-- Existing files are scaffold-level only.
+- Frontend auth and protected-route foundations are implemented.
+- Includes login/register pages, bootstrap refresh flow, and protected shell routes.
+- Uses cookie-based auth calls to the backend API.
 
 ## Planned Scope
 
-- Register and login screens.
-- Auth-protected dashboard.
-- Task list and CRUD UI.
-- Loading/error handling via TanStack Query.
-- API client with cookie-based auth handling.
+- Expand protected feature pages and polish task CRUD UX.
+- Increase test coverage and end-to-end auth/task scenarios.
 
 ## Run (Scaffold)
 

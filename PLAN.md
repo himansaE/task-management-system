@@ -21,16 +21,15 @@ Drizzle is selected as the “better tech choice” over heavier ORM options bec
 - `packages/contract`: shared Zod schemas and inferred types (single source of truth for FE/BE contracts).
 - `packages/database`: Drizzle schema, migrations, and DB client.
 
-Frontend integration (Axios + TanStack Query) is planned for the frontend phase; current `apps/web` remains scaffold-level while backend delivery is prioritized. Backend is organized by domain modules (`auth`, `tasks`) and enforces ownership in every task query (`WHERE user_id = current_user`).
+Frontend integration (Axios + TanStack Query) is active for auth and protected-route bootstrap flows, while remaining task UX improvements are incremental. Backend is organized by domain modules (`auth`, `tasks`) and enforces ownership in every task query (`WHERE user_id = current_user`).
 UI uses shadcn/ui components with Tailwind token-based styling and a CSS-variable theme system for correct light/dark mode behavior and accessible contrast.
 
 ## 3) Security Considerations
 
 **Authentication and token storage**
-- JWT stored in `HttpOnly`, `Secure`, `SameSite=Strict` cookie (not localStorage).
-- Token Versioning implemented via `users.token_version` and JWT payload version claim.
-- Auth guard compares token version with DB value; mismatch invalidates token immediately.
-- Supports instant revocation (logout all devices / credential reset) by incrementing `token_version`.
+- Access and refresh JWTs are stored in `HttpOnly` cookies (not localStorage).
+- Refresh sessions are persisted server-side and rotated on each refresh.
+- Logout revokes only the current session, while revoke-all invalidates all sessions.
 
 **Credential and input security**
 - Password hashing with Argon2id.
@@ -59,7 +58,7 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - Better-tech choices justified (NestJS + Drizzle + Supabase, shadcn + Tailwind).
 
 **Phase 2 — Implementation & Deployment**
-- Frontend: deferred in current phase (planned: Register/Login, dashboard, task create/edit, loading/error states, route protection).
+- Frontend: Register/Login, protected shell routes, bootstrap refresh, and auth-state handling are implemented.
 - Backend: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/revoke`, `GET/POST/PUT/DELETE /tasks`.
 - Security: password hashing, validation/sanitization, rate limiting, secure token storage, ownership enforcement, safe error handling.
 - Deployment: backend + DB active; frontend deployment follows frontend implementation phase.
@@ -75,7 +74,8 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - Added task list query support: `status`, `priority`, `page`, `limit`.
 - Added task `status` support to create/update payloads.
 - Enforced owner-scoped update/delete directly at query level.
-- Updated logout flow to revoke sessions via token version increment and clear auth cookies.
+- Updated logout flow to revoke sessions and clear auth cookies.
+- Added session-backed auth flow for concurrent sessions, refresh rotation, current-session logout, and global revoke-all behavior.
 
 **Phase 3 — Review & Walkthrough**
 - Code walkthrough with architecture and tradeoff explanations.

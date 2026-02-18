@@ -4,7 +4,7 @@ Associate Software Engineer assessment.
 
 ## Stack
 
-- Frontend (planned / deferred in current phase): Next.js (App Router), Tailwind CSS, shadcn/ui, TanStack Query, Axios
+- Frontend: Next.js (App Router), Tailwind CSS, shadcn/ui, TanStack Query, Axios
 - Backend: NestJS (Express), Drizzle ORM
 - Database: PostgreSQL (Supabase)
 - Monorepo: Turborepo + pnpm
@@ -43,10 +43,10 @@ Associate Software Engineer assessment.
 
 ## Current Implementation Status (February 2026)
 
-- Backend is implemented for auth + task CRUD with secure cookie auth, token versioning, and ownership checks.
+- Backend is implemented for auth + task CRUD with secure cookie auth, session records, and ownership checks.
 - API success responses use a standardized envelope: `{"data": ...}` and list endpoints include `meta`.
 - `GET /tasks` supports `status`, `priority`, `page`, and `limit` query parameters.
-- Frontend in `apps/web` is deferred for the current phase and remains scaffold-level.
+- Frontend in `apps/web` includes login/register pages, protected routes, and auth bootstrap/session handling.
 
 ## API Documentation
 
@@ -78,8 +78,8 @@ Why this default:
 
 ## Security Highlights
 
-- JWT in `HttpOnly` + `Secure` + `SameSite=Strict` cookies
-- Token versioning for immediate session revocation
+- JWT in `HttpOnly` cookies with environment-aware policy (`Lax` local dev, `None` in production for cross-site)
+- Session-based refresh token rotation with per-session logout and global revoke support
 - Argon2id password hashing
 - Global validation/sanitization via Zod + pipes
 - Rate limiting + secure headers (Helmet)
@@ -96,7 +96,7 @@ Why this default:
 - Architecture and security planning: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ### Phase 2 — Implementation & Deployment 
-- Frontend: deferred in current phase (planned: login/register, dashboard, task create/edit, loading/error states, route protection)
+- Frontend: login/register, protected dashboard shell, task flows, route protection, and cookie-based auth bootstrap
 - Backend endpoints:
    - `POST /auth/register`
    - `POST /auth/login`

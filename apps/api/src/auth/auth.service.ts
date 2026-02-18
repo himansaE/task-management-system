@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { JwtService } from '@nestjs/jwt';
 import { LoginInput, RegisterInput } from '@repo/contract';
 import * as argon2 from 'argon2';
@@ -35,10 +36,9 @@ export class AuthService {
       email: normalizedEmail,
       name: input.name.trim(),
       passwordHash: await this.hashPassword(input.password),
-      tokenVersion: 1,
     });
 
-    const tokens = await this.issueTokens(user.id, user.tokenVersion);
+    const tokens = await this.createSessionAndIssueTokens(user.id);
 
     return {
       user: this.publicUser(user),
@@ -54,24 +54,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const nextTokenVersion = user.tokenVersion + 1;
-
-    const persistedUser = await this.authRepository.updateTokenVersion(
-      user.id,
-      nextTokenVersion,
-    );
-
-    if (!persistedUser) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const tokens = await this.issueTokens(
-      persistedUser.id,
-      persistedUser.tokenVersion,
-    );
+    const tokens = await this.createSessionAndIssueTokens(user.id);
 
     return {
-      user: this.publicUser(persistedUser),
+      user: this.publicUser(user),
       ...tokens,
     };
   }
@@ -90,35 +76,48 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    if (payload.typ !== 'refresh') {
+    if (payload.typ !== 'refresh' || !payload.sid) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
     const user = await this.authRepository.findById(payload.sub);
 
-    if (!user || user.tokenVersion !== payload.v) {
+    if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const nextTokenVersion = user.tokenVersion + 1;
-
-    const refreshedUser = await this.authRepository.updateTokenVersion(
+    const session = await this.authRepository.findActiveSession(
+      payload.sid,
       user.id,
-      nextTokenVersion,
     );
 
-    if (!refreshedUser) {
+    if (!session) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const tokens = await this.issueTokens(
-      refreshedUser.id,
-      refreshedUser.tokenVersion,
+    if (!this.compareTokenHash(refreshToken, session.refreshTokenHash)) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const tokens = await this.issueTokens(user.id, session.id);
+
+    const rotatedSession = await this.authRepository.rotateSession(
+      session.id,
+      this.hashToken(tokens.refreshToken),
+      this.refreshExpiryDate(),
     );
+
+    if (!rotatedSession) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
     return {
       ...tokens,
     };
+  }
+
+  async logoutSession(userId: string, sessionId: string) {
+    await this.authRepository.revokeSession(sessionId, userId);
   }
 
   async revokeAll(userId: string) {
@@ -128,10 +127,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    await this.authRepository.updateTokenVersion(
-      user.id,
-      user.tokenVersion + 1,
-    );
+    await this.authRepository.revokeAllSessions(user.id);
   }
 
   private async hashPassword(password: string) {
@@ -140,16 +136,34 @@ export class AuthService {
     });
   }
 
-  private async issueTokens(userId: string, tokenVersion: number) {
+  private async createSessionAndIssueTokens(userId: string) {
+    const sessionId = randomUUID();
+    const tokens = await this.issueTokens(userId, sessionId);
+
+    const session = await this.authRepository.createSession({
+      id: sessionId,
+      userId,
+      refreshTokenHash: this.hashToken(tokens.refreshToken),
+      expiresAt: this.refreshExpiryDate(),
+    });
+
+    if (!session) {
+      throw new UnauthorizedException('Unable to create auth session');
+    }
+
+    return tokens;
+  }
+
+  private async issueTokens(userId: string, sessionId: string) {
     const accessPayload: JwtTokenPayload = {
       sub: userId,
-      v: tokenVersion,
+      sid: sessionId,
       typ: 'access',
     };
 
     const refreshPayload: JwtTokenPayload = {
       sub: userId,
-      v: tokenVersion,
+      sid: sessionId,
       typ: 'refresh',
     };
 
@@ -164,6 +178,24 @@ export class AuthService {
       }),
     ]);
     return { accessToken, refreshToken };
+  }
+
+  private refreshExpiryDate() {
+    return new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000);
+  }
+
+  private hashToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private compareTokenHash(token: string, hash: string) {
+    const tokenHash = this.hashToken(token);
+
+    if (tokenHash.length !== hash.length) {
+      return false;
+    }
+
+    return timingSafeEqual(Buffer.from(tokenHash), Buffer.from(hash));
   }
 
   private publicUser(user: AuthUserRecord) {

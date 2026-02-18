@@ -2,7 +2,7 @@
 
 > Internal reference document. Not a deliverable — complements the 1-page [PLAN.md](PLAN.md).
 
-> Implementation status (February 2026): backend is active; frontend work is intentionally deferred to the next phase.
+> Implementation status (February 2026): backend and core frontend auth/protected-route flows are active.
 
 ---
 
@@ -43,7 +43,7 @@ flowchart LR
 | Layer | Technology | Why This Over Alternatives |
 |---|---|---|
 | **Monorepo** | Turborepo + pnpm | Cached builds, shared `tsconfig`/`eslint`, strict package boundaries. pnpm's strict node_modules prevents phantom deps. |
-| **Frontend** | Next.js (App Router) | Planned target for the frontend phase. Current codebase keeps backend-first delivery and defers full frontend feature implementation. |
+| **Frontend** | Next.js (App Router) | Active for auth + protected-route flows. Remaining task UX improvements continue iteratively. |
 | **UI** | Tailwind CSS + Shadcn/ui | shadcn component primitives with Tailwind token-based styling. Theme values come from semantic CSS variables and are switched by a theme provider for correct light/dark modes without hardcoded colors. |
 | **HTTP Client** | Axios | Response interceptors enable global 401 handling (auto-redirect to login) and consistent error mapping. `credentials: 'include'` auto-sends cookies. `fetch` lacks interceptors without wrapper boilerplate. |
 | **State Mgmt** | TanStack Query | Server-state solution: handles `isLoading`, `isError`, `data`, cache invalidation, and optimistic updates. Dehydrate/hydrate pattern enables SSR → client handoff with zero loading flicker. Replaces manual `useEffect` patterns. |
@@ -65,32 +65,32 @@ flowchart LR
 
 ## 3. Security Architecture — Deep Dive
 
-### 3.1 Authentication: Token Versioning Strategy
+### 3.1 Authentication: Session Records
 
-Standard JWTs are stateless — once issued, they cannot be revoked until expiry. This is a known weakness. Token Versioning solves this without maintaining a server-side blacklist.
+Standard JWTs are stateless — once issued, they cannot be revoked until expiry. This implementation uses server-side session records for per-device revocation and refresh rotation.
 
 **Database Schema:**
 ```
-users.token_version: INTEGER DEFAULT 0
+auth_sessions: { id, user_id, refresh_token_hash, expires_at, revoked_at }
 ```
 
 **Login Flow:**
 1. User submits credentials → server validates → Argon2id hash comparison.
-2. Server generates JWT: `{ sub: user.id, v: user.token_version, iat, exp }`.
-3. JWT placed in response cookie: `Set-Cookie: token=<jwt>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400`.
+2. Server creates an auth session row and generates access/refresh JWTs: `{ sub: user.id, sid: session.id, typ, iat, exp }`.
+3. Tokens are placed in HttpOnly cookies (`access_token`, `refresh_token`) with environment-aware SameSite policy.
 4. Browser stores cookie — JavaScript cannot read it (`HttpOnly`).
 
 **Request Authentication:**
 1. `JwtAuthGuard` extracts token from cookie header.
 2. Verifies JWT signature and expiry.
 3. Loads user from DB.
-4. **Version check:** `if (payload.v !== user.token_version) → 401 Unauthorized`.
+4. **Checks:** active session check (`payload.sid` maps to non-revoked session).
 5. Attaches `user` to request context via custom request decorators.
 
-**Revocation (Logout All Devices / Password Reset / Security Breach):**
-1. `POST /auth/revoke` → increments `user.token_version` in database.
-2. All existing JWTs carry the old version → instantly rejected by the guard.
-3. No token blacklist needed. O(1) revocation.
+**Revocation:**
+1. `POST /auth/logout` revokes only the current session (`auth_sessions.revoked_at = now`) and clears cookies.
+2. `POST /auth/revoke` revokes all active sessions for the user.
+3. `POST /auth/refresh` rotates the refresh token hash for the active session.
 
 ### 3.2 Cookie Security Flags
 
@@ -98,7 +98,7 @@ users.token_version: INTEGER DEFAULT 0
 |---|---|---|
 | `HttpOnly` | `true` | Prevents `document.cookie` access → mitigates XSS token theft |
 | `Secure` | `true` | Cookie only sent over HTTPS → prevents MITM interception |
-| `SameSite` | `Strict` | Cookie not sent on cross-origin requests → mitigates CSRF |
+| `SameSite` | `Lax` (local dev) / `None` (production cross-site) | Allows cross-site deployment while preserving secure defaults |
 | `Path` | `/` | Cookie available to all API routes |
 | `Max-Age` | `86400` (24h) | Token expiry aligned with JWT `exp` claim |
 
@@ -107,7 +107,7 @@ users.token_version: INTEGER DEFAULT 0
 | Layer | Mechanism | Threat Mitigated |
 |---|---|---|
 | **Transport** | HTTPS only (Secure cookie flag) | Man-in-the-middle |
-| **Authentication** | JWT + Token Versioning | Session hijacking, stale tokens |
+| **Authentication** | JWT + Session Records | Session hijacking, stale tokens |
 | **Authorization** | Ownership check in every task query (`WHERE user_id = $1`) | Horizontal privilege escalation |
 | **Input** | Zod schema validation + `whitelist: true` (strip unknown fields) | Injection, mass assignment |
 | **Rate Limiting** | ThrottlerModule: 5/min auth, 100/min data | Brute-force, credential stuffing, DoS |
@@ -117,7 +117,7 @@ users.token_version: INTEGER DEFAULT 0
 
 ### 3.4 CSRF Protection Strategy
 
-With `SameSite=Strict` cookies, CSRF via cross-origin form submissions is blocked at the browser level. Combined with HttpOnly cookies and route-level authentication guards, this keeps session handling simple while reducing CSRF and token theft risk.
+With credentialed CORS allowlisting, HttpOnly cookies, and route-level guards, the system supports secure cross-site deployments while reducing token theft risk. For production cross-site deployments, `Secure` + `SameSite=None` is required.
 
 ---
 
@@ -134,7 +134,6 @@ erDiagram
     varchar email UK
     varchar name
     varchar password
-    int token_version
     timestamptz created_at
     timestamptz updated_at
   }
@@ -155,7 +154,6 @@ erDiagram
 ### 4.2 Design Decisions
 
 - **UUID primary keys**: Prevents enumeration attacks (`/tasks/1`, `/tasks/2`). Safe for distributed ID generation.
-- **`token_version`**: Critical for the Token Versioning security strategy. Integer increment is atomic and race-condition safe.
 - **`user_id` indexed**: Tasks are always queried by owner. Index ensures O(log n) lookups.
 - **ENUM types**: Status and priority are constrained at the database level — invalid values are impossible, not just validated.
 - **Timestamps with timezone**: `TIMESTAMPTZ` avoids timezone ambiguity. `updated_at` auto-updates via Drizzle `.$onUpdate()`.
@@ -191,10 +189,10 @@ Every API response follows a predictable shape. The frontend never needs to gues
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | `POST` | `/auth/register` | Public | Create account and issue auth cookies. Returns user payload. |
-| `POST` | `/auth/login` | Public | Validate credentials → Set HttpOnly cookie (JWT). |
-| `POST` | `/auth/refresh` | Cookie | Reissue JWT with fresh expiry. Checks `token_version`. |
-| `POST` | `/auth/logout` | Cookie | Revoke current session by incrementing `token_version`, then clear auth cookies. |
-| `POST` | `/auth/revoke` | Cookie | Revoke all user sessions by incrementing `token_version`, then clear auth cookies. |
+| `POST` | `/auth/login` | Public | Validate credentials, create new auth session, set HttpOnly access/refresh cookies. |
+| `POST` | `/auth/refresh` | Cookie | Rotate refresh token for current session and reissue access/refresh cookies. |
+| `POST` | `/auth/logout` | Cookie | Revoke current session and clear auth cookies. |
+| `POST` | `/auth/revoke` | Cookie | Revoke all sessions and clear auth cookies. |
 | `GET` | `/tasks` | Cookie | List authenticated user's tasks. Supports `?status=&priority=&page=&limit=`. |
 | `POST` | `/tasks` | Cookie | Create task. Title required; `status` supported and defaults to `TODO`. |
 | `PUT` | `/tasks/:id` | Cookie | Update task. Ownership enforced (`WHERE id = $1 AND user_id = $2`). |
@@ -235,8 +233,8 @@ root/
 ├── apps/
 │   ├── web/                     # Next.js frontend
 │   │   ├── src/
-│   │   │   ├── app/             # Routing layer (scaffold + deferred feature routes)
-│   │   │   ├── lib/             # planned client utilities
+│   │   │   ├── app/             # Routing layer (auth + protected routes active)
+│   │   │   ├── lib/             # API/auth/query utilities
 │   │   │   └── providers/       # App-level providers
 │   └── api/                     # NestJS backend
 │       ├── src/

@@ -24,7 +24,10 @@ import type { Request, Response } from 'express';
 import { loginSchema, registerSchema } from '@repo/contract';
 import { ApiErrorResponseDto } from '../common/dto/api-error-response.dto';
 import { OkResponseDto } from '../common/dto/ok-response.dto';
-import { CurrentUserId } from '../common/request-user.decorator';
+import {
+  CurrentSessionId,
+  CurrentUserId,
+} from '../common/request-user.decorator';
 import { parseWithZod } from '../common/zod-parse';
 import { AuthService } from './auth.service';
 import {
@@ -47,42 +50,60 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  private getCookiePolicy() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = process.env.AUTH_COOKIE_DOMAIN;
+
+    return {
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      domain:
+        cookieDomain && cookieDomain.trim().length > 0
+          ? cookieDomain
+          : undefined,
+    };
+  }
+
   private applyAuthCookies(
     response: Response,
     accessToken: string,
     refreshToken: string,
   ) {
-    const secure = process.env.NODE_ENV === 'production';
+    const cookiePolicy = this.getCookiePolicy();
 
     response.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,
-      secure,
-      sameSite: 'strict',
+      secure: cookiePolicy.secure,
+      sameSite: cookiePolicy.sameSite,
+      domain: cookiePolicy.domain,
       path: '/',
       maxAge: ACCESS_TOKEN_TTL_SECONDS * 1000,
     });
 
     response.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
       httpOnly: true,
-      secure,
-      sameSite: 'strict',
+      secure: cookiePolicy.secure,
+      sameSite: cookiePolicy.sameSite,
+      domain: cookiePolicy.domain,
       path: '/',
       maxAge: REFRESH_TOKEN_TTL_SECONDS * 1000,
     });
   }
 
   private clearAuthCookies(response: Response) {
-    const secure = process.env.NODE_ENV === 'production';
+    const cookiePolicy = this.getCookiePolicy();
 
     response.clearCookie(ACCESS_TOKEN_COOKIE, {
       path: '/',
-      sameSite: 'strict',
-      secure,
+      sameSite: cookiePolicy.sameSite,
+      secure: cookiePolicy.secure,
+      domain: cookiePolicy.domain,
     });
     response.clearCookie(REFRESH_TOKEN_COOKIE, {
       path: '/',
-      sameSite: 'strict',
-      secure,
+      sameSite: cookiePolicy.sameSite,
+      secure: cookiePolicy.secure,
+      domain: cookiePolicy.domain,
     });
   }
 
@@ -178,9 +199,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async logout(
     @CurrentUserId() userId: string,
+    @CurrentSessionId() sessionId: string,
     @Res({ passthrough: true }) response: Response,
   ) {
-    await this.authService.revokeAll(userId);
+    await this.authService.logoutSession(userId, sessionId);
     this.clearAuthCookies(response);
     return { data: { ok: true } as OkResponseDto };
   }

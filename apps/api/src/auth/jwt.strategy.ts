@@ -21,13 +21,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtTokenPayload) {
-    if (payload.typ !== 'access') {
+    if (payload.typ !== 'access' || !payload.sid) {
       throw new UnauthorizedException('Invalid token type');
     }
 
     const user = await this.authRepository.findById(payload.sub);
 
-    if (!user || user.tokenVersion !== payload.v) {
+    if (!user) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const session = await this.authRepository.findActiveSession(
+      payload.sid,
+      user.id,
+    );
+
+    if (!session) {
       throw new UnauthorizedException('Invalid token');
     }
 
@@ -35,6 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       sub: user.id,
       email: user.email,
       name: user.name,
+      sid: session.id,
     };
   }
 }

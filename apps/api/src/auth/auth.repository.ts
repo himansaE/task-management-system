@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { eq, users } from '@repo/database';
+import { and, authSessions, eq, gt, isNull, users } from '@repo/database';
 import { DatabaseService } from '../database/database.service';
 
 export type AuthUserRecord = typeof users.$inferSelect;
+export type AuthSessionRecord = typeof authSessions.$inferSelect;
 
 @Injectable()
 export class AuthRepository {
@@ -28,12 +29,7 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
-  async create(input: {
-    email: string;
-    name: string;
-    passwordHash: string;
-    tokenVersion: number;
-  }) {
+  async create(input: { email: string; name: string; passwordHash: string }) {
     const rows = await this.databaseService.db
       .insert(users)
       .values(input)
@@ -41,13 +37,75 @@ export class AuthRepository {
     return rows[0];
   }
 
-  async updateTokenVersion(userId: string, tokenVersion: number) {
+  async createSession(input: {
+    id: string;
+    userId: string;
+    refreshTokenHash: string;
+    expiresAt: Date;
+  }) {
     const rows = await this.databaseService.db
-      .update(users)
-      .set({ tokenVersion, updatedAt: new Date() })
-      .where(eq(users.id, userId))
+      .insert(authSessions)
+      .values(input)
       .returning();
 
     return rows[0] ?? null;
+  }
+
+  async findActiveSession(sessionId: string, userId: string) {
+    const now = new Date();
+
+    const rows = await this.databaseService.db
+      .select()
+      .from(authSessions)
+      .where(
+        and(
+          eq(authSessions.id, sessionId),
+          eq(authSessions.userId, userId),
+          isNull(authSessions.revokedAt),
+          gt(authSessions.expiresAt, now),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  async rotateSession(
+    sessionId: string,
+    refreshTokenHash: string,
+    expiresAt: Date,
+  ) {
+    const rows = await this.databaseService.db
+      .update(authSessions)
+      .set({ refreshTokenHash, expiresAt, updatedAt: new Date() })
+      .where(eq(authSessions.id, sessionId))
+      .returning();
+
+    return rows[0] ?? null;
+  }
+
+  async revokeSession(sessionId: string, userId: string) {
+    const rows = await this.databaseService.db
+      .update(authSessions)
+      .set({ revokedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(authSessions.id, sessionId),
+          eq(authSessions.userId, userId),
+          isNull(authSessions.revokedAt),
+        ),
+      )
+      .returning();
+
+    return rows[0] ?? null;
+  }
+
+  async revokeAllSessions(userId: string) {
+    await this.databaseService.db
+      .update(authSessions)
+      .set({ revokedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(eq(authSessions.userId, userId), isNull(authSessions.revokedAt)),
+      );
   }
 }

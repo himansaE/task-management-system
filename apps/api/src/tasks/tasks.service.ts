@@ -3,44 +3,29 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateTaskInput, TaskStatus, UpdateTaskInput } from '@repo/contract';
-import { tasks } from '@repo/database';
-import { randomUUID } from 'node:crypto';
-
-type TaskRecord = typeof tasks.$inferSelect;
+import { CreateTaskInput, UpdateTaskInput } from '@repo/contract';
+import { TaskRecord, TasksRepository } from './tasks.repository';
 
 @Injectable()
 export class TasksService {
-  private readonly tasksById = new Map<string, TaskRecord>();
+  constructor(private readonly tasksRepository: TasksRepository) {}
 
-  list(userId: string) {
-    return Array.from(this.tasksById.values()).filter(
-      (task) => task.ownerId === userId,
-    );
+  async list(userId: string) {
+    return this.tasksRepository.listByOwnerId(userId);
   }
 
-  create(userId: string, input: CreateTaskInput) {
-    const now = new Date();
-
-    const task: TaskRecord = {
-      id: randomUUID(),
+  async create(userId: string, input: CreateTaskInput) {
+    return this.tasksRepository.create({
       ownerId: userId,
       title: input.title,
       description: input.description ?? null,
       priority: input.priority,
-      status: 'TODO' as TaskStatus,
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.tasksById.set(task.id, task);
-
-    return task;
+    });
   }
 
-  update(userId: string, taskId: string, input: UpdateTaskInput) {
-    const existing = this.tasksById.get(taskId);
+  async update(userId: string, taskId: string, input: UpdateTaskInput) {
+    const existing = await this.tasksRepository.findById(taskId);
 
     if (!existing) {
       throw new NotFoundException('Task not found');
@@ -50,8 +35,7 @@ export class TasksService {
       throw new ForbiddenException('Task does not belong to user');
     }
 
-    const nextTask: TaskRecord = {
-      ...existing,
+    const updated = await this.tasksRepository.updateById(taskId, {
       title: input.title ?? existing.title,
       description:
         input.description === undefined
@@ -65,15 +49,17 @@ export class TasksService {
             ? new Date(input.dueDate)
             : null,
       updatedAt: new Date(),
-    };
+    });
 
-    this.tasksById.set(taskId, nextTask);
+    if (!updated) {
+      throw new NotFoundException('Task not found');
+    }
 
-    return nextTask;
+    return updated as TaskRecord;
   }
 
-  remove(userId: string, taskId: string) {
-    const existing = this.tasksById.get(taskId);
+  async remove(userId: string, taskId: string) {
+    const existing = await this.tasksRepository.findById(taskId);
 
     if (!existing) {
       throw new NotFoundException('Task not found');
@@ -83,7 +69,7 @@ export class TasksService {
       throw new ForbiddenException('Task does not belong to user');
     }
 
-    this.tasksById.delete(taskId);
+    await this.tasksRepository.deleteById(taskId);
 
     return { ok: true };
   }

@@ -4,88 +4,104 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { LoginInput, RegisterInput } from '@repo/contract';
-import { users } from '@repo/database';
-import { createHash, randomUUID } from 'node:crypto';
-
-type UserRecord = typeof users.$inferSelect;
-
-type UserWithRefresh = UserRecord & {
-  refreshToken: string;
-};
+import { createHash } from 'node:crypto';
+import { AuthRepository, AuthUserRecord } from './auth.repository';
 
 @Injectable()
 export class AuthService {
-  private readonly usersById = new Map<string, UserWithRefresh>();
-  private readonly userIdByEmail = new Map<string, string>();
+  constructor(private readonly authRepository: AuthRepository) {}
 
-  register(input: RegisterInput) {
+  async register(input: RegisterInput) {
     const normalizedEmail = input.email.trim().toLowerCase();
 
-    if (this.userIdByEmail.has(normalizedEmail)) {
+    const existing = await this.authRepository.findByEmail(normalizedEmail);
+
+    if (existing) {
       throw new ConflictException('Email already registered');
     }
 
-    const id = randomUUID();
-    const now = new Date();
-    const refreshToken = randomUUID();
-
-    const user: UserWithRefresh = {
-      id,
+    const user = await this.authRepository.create({
       email: normalizedEmail,
       name: input.name.trim(),
       passwordHash: this.hashPassword(input.password),
-      tokenVersion: 0,
-      createdAt: now,
-      updatedAt: now,
-      refreshToken,
-    };
-
-    this.usersById.set(id, user);
-    this.userIdByEmail.set(normalizedEmail, id);
+      tokenVersion: 1,
+    });
 
     return {
       user: this.publicUser(user),
-      accessToken: this.makeAccessToken(user.id),
-      refreshToken,
+      accessToken: this.makeAccessToken(user.id, user.tokenVersion),
+      refreshToken: this.makeRefreshToken(user.id, user.tokenVersion),
     };
   }
 
-  login(input: LoginInput) {
+  async login(input: LoginInput) {
     const normalizedEmail = input.email.trim().toLowerCase();
-    const userId = this.userIdByEmail.get(normalizedEmail);
-
-    if (!userId) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const user = this.usersById.get(userId);
+    const user = await this.authRepository.findByEmail(normalizedEmail);
 
     if (!user || user.passwordHash !== this.hashPassword(input.password)) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    user.updatedAt = new Date();
-    user.refreshToken = randomUUID();
+    const nextTokenVersion = user.tokenVersion + 1;
+
+    const persistedUser = await this.authRepository.updateTokenVersion(
+      user.id,
+      nextTokenVersion,
+    );
+
+    if (!persistedUser) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     return {
-      user: this.publicUser(user),
-      accessToken: this.makeAccessToken(user.id),
-      refreshToken: user.refreshToken,
+      user: this.publicUser(persistedUser),
+      accessToken: this.makeAccessToken(
+        persistedUser.id,
+        persistedUser.tokenVersion,
+      ),
+      refreshToken: this.makeRefreshToken(
+        persistedUser.id,
+        persistedUser.tokenVersion,
+      ),
     };
   }
 
-  refresh(userId: string, refreshToken: string) {
-    const user = this.usersById.get(userId);
+  async refresh(userId: string, refreshToken: string) {
+    const user = await this.authRepository.findById(userId);
 
-    if (!user || user.refreshToken !== refreshToken) {
+    if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    user.updatedAt = new Date();
+    const expectedRefreshToken = this.makeRefreshToken(
+      user.id,
+      user.tokenVersion,
+    );
+
+    if (refreshToken !== expectedRefreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const nextTokenVersion = user.tokenVersion + 1;
+
+    const refreshedUser = await this.authRepository.updateTokenVersion(
+      user.id,
+      nextTokenVersion,
+    );
+
+    if (!refreshedUser) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
     return {
-      accessToken: this.makeAccessToken(user.id),
-      refreshToken: user.refreshToken,
+      accessToken: this.makeAccessToken(
+        refreshedUser.id,
+        refreshedUser.tokenVersion,
+      ),
+      refreshToken: this.makeRefreshToken(
+        refreshedUser.id,
+        refreshedUser.tokenVersion,
+      ),
     };
   }
 
@@ -93,11 +109,15 @@ export class AuthService {
     return createHash('sha256').update(password).digest('hex');
   }
 
-  private makeAccessToken(userId: string) {
-    return `dev-token-${userId}`;
+  private makeAccessToken(userId: string, tokenVersion: number) {
+    return `dev-token-${userId}-${tokenVersion}`;
   }
 
-  private publicUser(user: UserRecord) {
+  private makeRefreshToken(userId: string, tokenVersion: number) {
+    return `dev-refresh-${userId}-${tokenVersion}`;
+  }
+
+  private publicUser(user: AuthUserRecord) {
     return {
       id: user.id,
       email: user.email,

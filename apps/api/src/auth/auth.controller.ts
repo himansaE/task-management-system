@@ -191,6 +191,7 @@ export class AuthController {
     description: 'Unauthorized',
     type: ApiErrorResponseDto,
   })
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get('me')
   @UseGuards(JwtAuthGuard)
   getCurrentUser(@Req() request: Request) {

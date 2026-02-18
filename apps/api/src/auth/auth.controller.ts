@@ -9,9 +9,20 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiCookieAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiTooManyRequestsResponse,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { loginSchema, registerSchema } from '@repo/contract';
+import { OkResponseDto } from '../common/dto/ok-response.dto';
 import { CurrentUserId } from '../common/request-user.decorator';
 import { parseWithZod } from '../common/zod-parse';
 import { AuthService } from './auth.service';
@@ -21,8 +32,12 @@ import {
   REFRESH_TOKEN_COOKIE,
   REFRESH_TOKEN_TTL_SECONDS,
 } from './auth.constants';
+import { AuthUserResponseDto } from './dto/auth-user-response.dto';
+import { LoginRequestDto } from './dto/login-request.dto';
+import { RegisterRequestDto } from './dto/register-request.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
+@ApiTags('auth')
 @Throttle({ default: { limit: 5, ttl: 60_000 } })
 @Controller('auth')
 export class AuthController {
@@ -57,6 +72,11 @@ export class AuthController {
     response.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/' });
   }
 
+  @ApiOperation({ summary: 'Register a new account' })
+  @ApiBody({ type: RegisterRequestDto })
+  @ApiOkResponse({ type: AuthUserResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid payload' })
+  @ApiTooManyRequestsResponse({ description: 'Too many attempts' })
   @Post('register')
   async register(
     @Body() body: unknown,
@@ -71,6 +91,11 @@ export class AuthController {
     };
   }
 
+  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiBody({ type: LoginRequestDto })
+  @ApiOkResponse({ type: AuthUserResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
+  @ApiTooManyRequestsResponse({ description: 'Too many attempts' })
   @Post('login')
   async login(
     @Body() body: unknown,
@@ -85,6 +110,10 @@ export class AuthController {
     };
   }
 
+  @ApiOperation({ summary: 'Refresh auth session using refresh cookie' })
+  @ApiOkResponse({ type: OkResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid refresh token' })
+  @ApiTooManyRequestsResponse({ description: 'Too many attempts' })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
@@ -105,6 +134,9 @@ export class AuthController {
     return { ok: true };
   }
 
+  @ApiOperation({ summary: 'Logout current session' })
+  @ApiOkResponse({ type: OkResponseDto })
+  @ApiTooManyRequestsResponse({ description: 'Too many attempts' })
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   logout(@Res({ passthrough: true }) response: Response) {
@@ -112,6 +144,11 @@ export class AuthController {
     return { ok: true };
   }
 
+  @ApiOperation({ summary: 'Revoke all user sessions' })
+  @ApiCookieAuth('accessToken')
+  @ApiOkResponse({ type: OkResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiTooManyRequestsResponse({ description: 'Too many attempts' })
   @Post('revoke')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)

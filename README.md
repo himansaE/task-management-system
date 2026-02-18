@@ -5,7 +5,7 @@ Associate Software Engineer assessment.
 ## Stack
 
 - Frontend: Next.js (App Router), Tailwind CSS, shadcn/ui, TanStack Query, Axios
-- Backend: NestJS (Fastify), Drizzle ORM
+- Backend: NestJS (Express), Drizzle ORM
 - Database: PostgreSQL (Supabase)
 - Monorepo: Turborepo + pnpm
 
@@ -40,6 +40,10 @@ Associate Software Engineer assessment.
 - `GET /health/db` — checks DB connectivity and returns:
   - `200 {"status":"ok"}` when database is reachable
   - `503` when database is unavailable
+
+## API Documentation
+
+- Swagger UI is available at `GET /api/docs`
 
 ## CI/CD Strategy (Hybrid)
 

@@ -46,7 +46,7 @@ flowchart LR
 | **HTTP Client** | Axios | Response interceptors enable global 401 handling (auto-redirect to login) and consistent error mapping. `credentials: 'include'` auto-sends cookies. `fetch` lacks interceptors without wrapper boilerplate. |
 | **State Mgmt** | TanStack Query | Server-state solution: handles `isLoading`, `isError`, `data`, cache invalidation, and optimistic updates. Dehydrate/hydrate pattern enables SSR → client handoff with zero loading flicker. Replaces manual `useEffect` patterns. |
 | **Form Validation** | react-hook-form + Zod | Shares Zod schemas from `packages/contract`. Validation runs client-side before submission AND server-side via NestJS pipes — same rules, zero drift. |
-| **Backend** | NestJS + Fastify | DI container enforces separation of concerns. Fastify adapter generally provides better throughput than Express in comparable setups. Built-in support for Guards, Pipes, Interceptors, Filters — clean middleware layering without ad-hoc Express middleware chains. |
+| **Backend** | NestJS + Express | DI container enforces separation of concerns. Built-in support for Guards, Pipes, Interceptors, and Filters provides clean middleware layering without ad-hoc chains. |
 | **ORM** | Drizzle ORM | Zero-runtime (no query engine binary like Prisma). SQL-aligned syntax reduces abstraction leaks. Type inference from schema → queries → responses. Edge-compatible (no WASM dependency). |
 | **Database** | PostgreSQL (Supabase) | Relational integrity for `users.id → tasks.user_id`. Supabase adds RLS as defense-in-depth. Managed backups, connection pooling via PgBouncer. |
 | **Hashing** | Argon2id | Winner of the Password Hashing Competition. Memory-hard: resistant to GPU/ASIC attacks. Configurable memory cost, time cost, parallelism. Superior to Bcrypt for modern threat models. |
@@ -81,12 +81,12 @@ users.token_version: INTEGER DEFAULT 0
 **Request Authentication:**
 1. `JwtAuthGuard` extracts token from cookie header.
 2. Verifies JWT signature and expiry.
-3. Loads user from DB (with in-memory cache for hot path).
+3. Loads user from DB.
 4. **Version check:** `if (payload.v !== user.token_version) → 401 Unauthorized`.
-5. Attaches `user` to request context via `@CurrentUser()` decorator.
+5. Attaches `user` to request context via custom request decorators.
 
 **Revocation (Logout All Devices / Password Reset / Security Breach):**
-1. `PATCH /auth/revoke` → increments `user.token_version` in database.
+1. `POST /auth/revoke` → increments `user.token_version` in database.
 2. All existing JWTs carry the old version → instantly rejected by the guard.
 3. No token blacklist needed. O(1) revocation.
 
@@ -115,7 +115,7 @@ users.token_version: INTEGER DEFAULT 0
 
 ### 3.4 CSRF Protection Strategy
 
-With `SameSite=Strict` cookies, CSRF via cross-origin form submissions is blocked at the browser level. As an additional defense, the `JwtAuthGuard` validates the `Origin` header on state-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) against a whitelist of allowed origins. This double-layer approach avoids the complexity of CSRF tokens while maintaining security.
+With `SameSite=Strict` cookies, CSRF via cross-origin form submissions is blocked at the browser level. Combined with HttpOnly cookies and route-level authentication guards, this keeps session handling simple while reducing CSRF and token theft risk.
 
 ---
 
@@ -188,14 +188,14 @@ Every API response follows a predictable shape. The frontend never needs to gues
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/auth/register` | Public | Create account. Returns user (no token — forces login). |
+| `POST` | `/auth/register` | Public | Create account and issue auth cookies. Returns user payload. |
 | `POST` | `/auth/login` | Public | Validate credentials → Set HttpOnly cookie (JWT). |
 | `POST` | `/auth/refresh` | Cookie | Reissue JWT with fresh expiry. Checks `token_version`. |
 | `POST` | `/auth/logout` | Cookie | Clear cookie. Optionally increment `token_version`. |
 | `GET` | `/tasks` | Cookie | List authenticated user's tasks. Supports `?status=&priority=&page=&limit=`. |
 | `POST` | `/tasks` | Cookie | Create task. Title required, status defaults to `TODO`. |
 | `PUT` | `/tasks/:id` | Cookie | Update task. Ownership enforced (`WHERE id = $1 AND user_id = $2`). |
-| `DELETE` | `/tasks/:id` | Cookie | Delete task. Ownership enforced. Returns `204 No Content`. |
+| `DELETE` | `/tasks/:id` | Cookie | Delete task. Ownership enforced. Returns `{ ok: true }`. |
 
 ### 5.3 Possible Use Cases
 
@@ -335,7 +335,7 @@ jobs:
 - `.env` and `.env.local` in `.gitignore`.
 - Production secrets managed via Vercel/Render dashboards — never in Git.
 - CI deployment secrets (when enabled): `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `RENDER_DEPLOY_HOOK`.
-- **Typed config:** NestJS `ConfigModule` validates env vars with Zod on startup. Missing or malformed variables crash the app immediately with a clear error, not randomly at runtime.
+- API and DB tooling load environment files deterministically with dotenv (`.env` in app/root contexts).
 
 ---
 
@@ -363,26 +363,17 @@ pnpm dev  # Turborepo runs apps/web + apps/api concurrently
 
 ### 8.2 API Documentation
 
-**Swagger/OpenAPI** auto-generated from NestJS decorators and Zod schemas. Available at `http://localhost:3001/api/docs` in development. Serves as the live contract reference — no manual YAML maintenance.
+**Swagger/OpenAPI** is generated from NestJS Swagger decorators and served at `http://localhost:3000/api/docs` in development. It acts as the live API reference without manual YAML maintenance.
 
-### 8.3 Typed Configuration
+### 8.3 Configuration
 
-```typescript
-// apps/api/src/config/app.config.ts
-const envSchema = z.object({
-  DATABASE_URL: z.string().url(),
-  JWT_SECRET: z.string().min(32),
-  CORS_ORIGIN: z.string().url(),
-  PORT: z.coerce.number().default(3001),
-});
-
-// If any variable is missing or invalid, the app crashes on startup
-// with a clear Zod error — not a cryptic "undefined" at runtime.
-```
+- API startup loads `.env` from current working directory first, then root fallback.
+- Database tooling prefers host-provided `DATABASE_URL` and falls back to repo `.env` for local runs.
+- `PORT` defaults to `3000` when unset.
 
 ### 8.4 Health Check
 
-`GET /health` — Returns `{ status: 'ok', db: 'connected', uptime: 12345 }`. Used by Render for liveness probes and by monitoring dashboards.
+`GET /health/db` — Returns `{ status: 'ok' }` when database connectivity works, and `503` when unavailable.
 
 ---
 

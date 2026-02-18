@@ -32,3 +32,7 @@ Run from repo root:
 
 - `GET /health/db` returns `{"status":"ok"}` when database connectivity works.
 - Returns HTTP `503` when database is unavailable.
+
+## API Docs
+
+- Swagger UI: `GET /api/docs`

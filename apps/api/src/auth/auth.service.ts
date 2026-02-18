@@ -80,9 +80,12 @@ export class AuthService {
     let payload: JwtTokenPayload;
 
     try {
-      payload = await this.jwtService.verifyAsync<JwtTokenPayload>(refreshToken, {
-        secret: REFRESH_TOKEN_SECRET,
-      });
+      payload = await this.jwtService.verifyAsync<JwtTokenPayload>(
+        refreshToken,
+        {
+          secret: REFRESH_TOKEN_SECRET,
+        },
+      );
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -125,7 +128,10 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    await this.authRepository.updateTokenVersion(user.id, user.tokenVersion + 1);
+    await this.authRepository.updateTokenVersion(
+      user.id,
+      user.tokenVersion + 1,
+    );
   }
 
   private async hashPassword(password: string) {
@@ -134,7 +140,7 @@ export class AuthService {
     });
   }
 
-  private issueTokens(userId: string, tokenVersion: number) {
+  private async issueTokens(userId: string, tokenVersion: number) {
     const accessPayload: JwtTokenPayload = {
       sub: userId,
       v: tokenVersion,
@@ -147,7 +153,7 @@ export class AuthService {
       typ: 'refresh',
     };
 
-    return Promise.all([
+    const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(accessPayload, {
         secret: ACCESS_TOKEN_SECRET,
         expiresIn: ACCESS_TOKEN_TTL_SECONDS,
@@ -156,7 +162,8 @@ export class AuthService {
         secret: REFRESH_TOKEN_SECRET,
         expiresIn: REFRESH_TOKEN_TTL_SECONDS,
       }),
-    ]).then(([accessToken, refreshToken]) => ({ accessToken, refreshToken }));
+    ]);
+    return { accessToken, refreshToken };
   }
 
   private publicUser(user: AuthUserRecord) {

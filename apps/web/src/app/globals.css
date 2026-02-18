@@ -119,4 +119,20 @@
   .error-banner {
     @apply rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive;
   }
+
+  .task-actions-trigger {
+    opacity: 1;
+    transition: opacity 150ms;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .group .task-actions-trigger {
+      opacity: 0;
+    }
+
+    .group:hover .task-actions-trigger,
+    .group .task-actions-trigger:focus-visible {
+      opacity: 1;
+    }
+  }
 }

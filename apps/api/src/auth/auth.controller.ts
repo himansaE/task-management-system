@@ -180,7 +180,7 @@ export class AuthController {
     const result = await this.authService.refresh(refreshToken);
     this.applyAuthCookies(response, result.accessToken, result.refreshToken);
 
-    return { data: { ok: true } as OkResponseDto };
+    return { data: { user: result.user } };
   }
 
   @ApiOperation({ summary: 'Logout current session' })

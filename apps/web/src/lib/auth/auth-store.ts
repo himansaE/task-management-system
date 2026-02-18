@@ -47,9 +47,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ status: "refreshing", error: null });
 
     try {
-      await refreshSession();
+      const user = await refreshSession();
       set({
         status: "authenticated",
+        user,
         isBootstrapped: true,
         error: null,
       });

@@ -112,6 +112,7 @@ export class AuthService {
     }
 
     return {
+      user: this.publicUser(user),
       ...tokens,
     };
   }

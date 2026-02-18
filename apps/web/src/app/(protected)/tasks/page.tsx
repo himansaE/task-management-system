@@ -1,238 +1,233 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { ListTasksQueryInput, TaskPriority, TaskStatus } from "@repo/contract";
 import { Badge } from "@ui/badge";
 import { Button } from "@ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@ui/card";
-import { Input } from "@ui/input";
-import { Select } from "@ui/select";
-import { Textarea } from "@ui/textarea";
+import { Skeleton } from "@ui/skeleton";
 import {
     useCreateTaskMutation,
     useDeleteTaskMutation,
     useTasksQuery,
     useUpdateTaskMutation,
 } from "@lib/query/tasks-hooks";
-
-const priorityOptions = [
-    { label: "Low", value: "LOW" },
-    { label: "Medium", value: "MEDIUM" },
-    { label: "High", value: "HIGH" },
-];
-
-const statusOptions = [
-    { label: "Todo", value: "TODO" },
-    { label: "In Progress", value: "IN_PROGRESS" },
-    { label: "Done", value: "DONE" },
-];
+import { useRouteAuthGuard } from "@lib/auth/use-route-auth-guard";
+import { Task } from "@lib/api/types";
+import {
+    ResponsiveDialog,
+    TaskDeleteAlert,
+    TaskEmptyState,
+    TaskFilters,
+    TaskForm,
+    TaskListSkeleton,
+    TaskPagination,
+    TaskRow,
+} from "@components/tasks";
 
 export default function TasksPage() {
-    const [status, setStatus] = useState<TaskStatus | "ALL">("ALL");
+    const { isLoading, isAuthenticated, canAccess } = useRouteAuthGuard("protected");
+
+    const [statusFilter, setStatusFilter] = useState<TaskStatus | "ALL">("ALL");
     const [priority, setPriority] = useState<TaskPriority | "ALL">("ALL");
     const [page, setPage] = useState(1);
     const limit = 10;
+
+    // Dialog states
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [deletingTask, setDeletingTask] = useState<Task | null>(null);
 
     const params = useMemo<ListTasksQueryInput>(
         () => ({
             page,
             limit,
-            status: status === "ALL" ? undefined : status,
+            status: statusFilter === "ALL" ? undefined : statusFilter,
             priority: priority === "ALL" ? undefined : priority,
         }),
-        [limit, page, priority, status],
+        [limit, page, priority, statusFilter],
     );
 
-    const tasksQuery = useTasksQuery(params);
+    const tasksQuery = useTasksQuery(params, isAuthenticated);
     const createTaskMutation = useCreateTaskMutation(params);
     const updateTaskMutation = useUpdateTaskMutation(params);
     const deleteTaskMutation = useDeleteTaskMutation(params);
 
-    async function onCreateTask(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        const formData = new FormData(event.currentTarget);
+    const totalPages = tasksQuery.data ? Math.max(1, Math.ceil(tasksQuery.data.meta.total / limit)) : 1;
+    const total = tasksQuery.data?.meta.total ?? 0;
+    const hasFilters = statusFilter !== "ALL" || priority !== "ALL";
 
-        const title = String(formData.get("title") ?? "").trim();
-        const description = String(formData.get("description") ?? "").trim();
-        const dueDate = String(formData.get("dueDate") ?? "").trim();
-        const taskPriority = String(formData.get("priority") ?? "MEDIUM") as TaskPriority;
+    const handleCreate = useCallback(
+        async (data: { title: string; description?: string; priority: TaskPriority; status?: TaskStatus; dueDate?: string }) => {
+            await createTaskMutation.mutateAsync({
+                title: data.title,
+                description: data.description,
+                dueDate: data.dueDate,
+                priority: data.priority,
+                status: "TODO",
+            });
+            setCreateOpen(false);
+        },
+        [createTaskMutation],
+    );
 
-        if (!title) {
-            return;
-        }
+    const handleEdit = useCallback(
+        async (data: { title: string; description?: string; priority: TaskPriority; status?: TaskStatus; dueDate?: string }) => {
+            if (!editingTask) return;
+            await updateTaskMutation.mutateAsync({
+                id: editingTask.id,
+                payload: {
+                    title: data.title,
+                    description: data.description,
+                    priority: data.priority,
+                    status: data.status,
+                    dueDate: data.dueDate,
+                },
+            });
+            setEditingTask(null);
+        },
+        [editingTask, updateTaskMutation],
+    );
 
-        await createTaskMutation.mutateAsync({
-            title,
-            description: description || undefined,
-            dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
-            priority: taskPriority,
-            status: "TODO",
-        });
+    const handleStatusChange = useCallback(
+        (id: string, newStatus: TaskStatus) => {
+            updateTaskMutation.mutate({ id, payload: { status: newStatus } });
+        },
+        [updateTaskMutation],
+    );
 
-        event.currentTarget.reset();
+    const handleDeleteConfirm = useCallback(() => {
+        if (!deletingTask) return;
+        deleteTaskMutation.mutate(deletingTask.id);
+        setDeletingTask(null);
+    }, [deletingTask, deleteTaskMutation]);
+
+    const clearFilters = useCallback(() => {
+        setStatusFilter("ALL");
+        setPriority("ALL");
+        setPage(1);
+    }, []);
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-[50vh] items-center justify-center">
+                <div className="space-y-2 text-center">
+                    <Skeleton className="mx-auto h-4 w-28" />
+                    <Skeleton className="mx-auto h-3 w-16" />
+                </div>
+            </div>
+        );
     }
 
-    const totalPages = tasksQuery.data ? Math.max(1, Math.ceil(tasksQuery.data.meta.total / limit)) : 1;
+    if (!canAccess) {
+        return null;
+    }
 
     return (
         <div className="space-y-6">
-            <section className="grid gap-4 lg:grid-cols-[360px_1fr]">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Create Task</CardTitle>
-                        <CardDescription>
-                            New tasks appear immediately via optimistic updates before server confirmation.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form className="space-y-4" onSubmit={onCreateTask}>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium" htmlFor="title">
-                                    Title
-                                </label>
-                                <Input id="title" name="title" maxLength={160} required />
-                            </div>
+            {/* Page header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-lg font-semibold tracking-tight">Tasks</h1>
+                    {total > 0 && (
+                        <Badge variant="secondary" className="text-[10px] tabular-nums">
+                            {total}
+                        </Badge>
+                    )}
+                </div>
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                    <Plus className="size-3.5" />
+                    New task
+                </Button>
+            </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium" htmlFor="description">
-                                    Description
-                                </label>
-                                <Textarea id="description" name="description" maxLength={2000} />
-                            </div>
+            {/* Filters */}
+            <TaskFilters
+                status={statusFilter}
+                priority={priority}
+                onStatusChange={(v) => { setStatusFilter(v); setPage(1); }}
+                onPriorityChange={(v) => { setPriority(v); setPage(1); }}
+            />
 
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium" htmlFor="priority">
-                                        Priority
-                                    </label>
-                                    <Select id="priority" name="priority" options={priorityOptions} defaultValue="MEDIUM" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium" htmlFor="dueDate">
-                                        Due date
-                                    </label>
-                                    <Input id="dueDate" name="dueDate" type="datetime-local" />
-                                </div>
-                            </div>
+            {/* Task list */}
+            {tasksQuery.isLoading ? (
+                <TaskListSkeleton />
+            ) : tasksQuery.isError ? (
+                <div className="error-banner">Unable to load tasks. Please try again.</div>
+            ) : tasksQuery.data?.data.length === 0 ? (
+                <TaskEmptyState
+                    hasFilters={hasFilters}
+                    onClearFilters={clearFilters}
+                    onCreateTask={() => setCreateOpen(true)}
+                />
+            ) : (
+                <div className="space-y-2">
+                    {tasksQuery.data?.data.map((task) => (
+                        <TaskRow
+                            key={task.id}
+                            task={task}
+                            onEdit={setEditingTask}
+                            onStatusChange={handleStatusChange}
+                            onDelete={setDeletingTask}
+                        />
+                    ))}
+                </div>
+            )}
 
-                            <Button type="submit" className="w-full" disabled={createTaskMutation.isPending}>
-                                {createTaskMutation.isPending ? "Creating..." : "Create task"}
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
+            {/* Pagination */}
+            <TaskPagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                onPageChange={setPage}
+            />
 
-                <Card>
-                    <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <CardTitle>Tasks</CardTitle>
-                            <CardDescription>Responsive board with optimistic create, update and delete.</CardDescription>
-                        </div>
-                        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-2">
-                            <Select
-                                options={[{ label: "All statuses", value: "ALL" }, ...statusOptions]}
-                                value={status}
-                                onChange={(event) => {
-                                    setPage(1);
-                                    setStatus(event.target.value as TaskStatus | "ALL");
-                                }}
-                            />
-                            <Select
-                                options={[{ label: "All priorities", value: "ALL" }, ...priorityOptions]}
-                                value={priority}
-                                onChange={(event) => {
-                                    setPage(1);
-                                    setPriority(event.target.value as TaskPriority | "ALL");
-                                }}
-                            />
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {tasksQuery.isLoading ? (
-                            <p className="text-sm text-muted-foreground">Loading tasks...</p>
-                        ) : tasksQuery.isError ? (
-                            <p className="text-sm text-destructive">Unable to load tasks.</p>
-                        ) : tasksQuery.data?.data.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No tasks found for current filters.</p>
-                        ) : (
-                            <ul className="space-y-3">
-                                {tasksQuery.data?.data.map((task) => {
-                                    const optimistic = task.id.startsWith("optimistic-");
+            {/* Create dialog */}
+            <ResponsiveDialog
+                open={createOpen}
+                onOpenChange={setCreateOpen}
+                title="Create task"
+                description="Add a new task to your list."
+            >
+                <TaskForm
+                    mode="create"
+                    isPending={createTaskMutation.isPending}
+                    onSubmit={handleCreate}
+                    onCancel={() => setCreateOpen(false)}
+                />
+            </ResponsiveDialog>
 
-                                    return (
-                                        <li key={task.id} className="surface p-4">
-                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                                <div className="space-y-2">
-                                                    <p className="font-medium leading-snug">{task.title}</p>
-                                                    {task.description ? (
-                                                        <p className="text-sm text-muted-foreground">{task.description}</p>
-                                                    ) : null}
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <Badge variant={task.priority === "HIGH" ? "destructive" : "secondary"}>
-                                                            {task.priority}
-                                                        </Badge>
-                                                        <Badge variant={task.status === "DONE" ? "success" : "outline"}>
-                                                            {task.status}
-                                                        </Badge>
-                                                        {optimistic ? <Badge variant="outline">Syncing...</Badge> : null}
-                                                    </div>
-                                                </div>
+            {/* Edit dialog */}
+            <ResponsiveDialog
+                open={!!editingTask}
+                onOpenChange={(open) => !open && setEditingTask(null)}
+                title="Edit task"
+                description="Update the task details."
+            >
+                {editingTask && (
+                    <TaskForm
+                        mode="edit"
+                        defaultValues={{
+                            title: editingTask.title,
+                            description: editingTask.description ?? undefined,
+                            priority: editingTask.priority,
+                            status: editingTask.status,
+                            dueDate: editingTask.dueDate ?? undefined,
+                        }}
+                        isPending={updateTaskMutation.isPending}
+                        onSubmit={handleEdit}
+                        onCancel={() => setEditingTask(null)}
+                    />
+                )}
+            </ResponsiveDialog>
 
-                                                <div className="flex flex-wrap gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            updateTaskMutation.mutate({
-                                                                id: task.id,
-                                                                payload: {
-                                                                    status:
-                                                                        task.status === "TODO"
-                                                                            ? "IN_PROGRESS"
-                                                                            : task.status === "IN_PROGRESS"
-                                                                                ? "DONE"
-                                                                                : "TODO",
-                                                                },
-                                                            })
-                                                        }
-                                                    >
-                                                        Next status
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="destructive"
-                                                        onClick={() => deleteTaskMutation.mutate(task.id)}
-                                                    >
-                                                        Delete
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        )}
-
-                        <div className="flex flex-col items-start justify-between gap-3 border-t border-border pt-4 text-sm sm:flex-row sm:items-center">
-                            <p className="text-muted-foreground">
-                                Total: {tasksQuery.data?.meta.total ?? 0} · Page {page} of {totalPages}
-                            </p>
-                            <div className="flex gap-2">
-                                <Button variant="outline" size="sm" onClick={() => setPage((value) => Math.max(1, value - 1))}>
-                                    Previous
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                                >
-                                    Next
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </section>
+            {/* Delete confirmation */}
+            <TaskDeleteAlert
+                open={!!deletingTask}
+                taskTitle={deletingTask?.title ?? ""}
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => setDeletingTask(null)}
+            />
         </div>
     );
 }

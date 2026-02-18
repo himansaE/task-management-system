@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { ModeToggle } from "@components/mode-toggle";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LogOut, Menu, X } from "lucide-react";
 import { Button } from "@ui/button";
+import { ModeToggle } from "@components/mode-toggle";
 import { useAuthStore } from "@lib/auth/auth-store";
 
 const navigation = [
-    { href: "/dashboard", label: "Dashboard" },
     { href: "/tasks", label: "Tasks" },
     { href: "/settings", label: "Settings" },
 ];
@@ -16,97 +16,129 @@ const navigation = [
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const status = useAuthStore((state) => state.status);
-    const isBootstrapped = useAuthStore((state) => state.isBootstrapped);
     const logoutAction = useAuthStore((state) => state.logoutAction);
     const [menuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
 
+    // Close mobile menu on route change
     useEffect(() => {
-        if (isBootstrapped && status === "unauthenticated") {
-            router.replace("/login");
+        setMenuOpen(false);
+    }, [pathname]);
+
+    // Close mobile menu on outside click
+    useEffect(() => {
+        if (!menuOpen) return;
+
+        function handleClick(event: MouseEvent) {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setMenuOpen(false);
+            }
         }
-    }, [isBootstrapped, status, router]);
 
-    if (!isBootstrapped || status === "refreshing" || status === "unknown") {
-        return (
-            <div className="flex min-h-screen items-center justify-center">
-                <p className="text-sm text-muted-foreground">Bootstrapping secure session...</p>
-            </div>
-        );
-    }
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key === "Escape") setMenuOpen(false);
+        }
 
-    if (status === "unauthenticated") {
-        return null;
-    }
+        document.addEventListener("mousedown", handleClick);
+        document.addEventListener("keydown", handleEscape);
+        return () => {
+            document.removeEventListener("mousedown", handleClick);
+            document.removeEventListener("keydown", handleEscape);
+        };
+    }, [menuOpen]);
+
+    const handleLogout = useCallback(async () => {
+        await logoutAction();
+        router.replace("/login");
+    }, [logoutAction, router]);
 
     return (
         <div className="min-h-screen bg-background">
-            <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-md">
-                <div className="page-container flex h-16 items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <button
-                            className="md:hidden rounded-md border border-border px-3 py-2 text-sm"
-                            onClick={() => setMenuOpen((value) => !value)}
-                            aria-label="Toggle navigation"
+            <a href="#main-content" className="skip-link">
+                Skip to content
+            </a>
+
+            <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-lg">
+                <div className="page-container flex h-14 items-center justify-between">
+                    <div className="flex items-center gap-6" ref={menuRef}>
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="md:hidden"
+                            onClick={() => setMenuOpen((v) => !v)}
+                            aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+                            aria-expanded={menuOpen}
                         >
-                            Menu
-                        </button>
-                        <Link href="/tasks" className="text-base font-semibold tracking-tight">
+                            {menuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+                        </Button>
+
+                        <Link
+                            href="/tasks"
+                            className="text-sm font-semibold tracking-tight text-foreground"
+                        >
                             TaskFlow Pro
                         </Link>
-                        <nav className="hidden items-center gap-2 md:flex">
+
+                        <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
                             {navigation.map((item) => (
                                 <Link
                                     key={item.href}
                                     href={item.href}
-                                    className={`rounded-md px-3 py-2 text-sm transition-colors ${pathname === item.href
-                                            ? "bg-accent text-accent-foreground"
-                                            : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+                                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${pathname === item.href
+                                        ? "bg-accent text-accent-foreground"
+                                        : "text-muted-foreground hover:text-foreground"
                                         }`}
                                 >
                                     {item.label}
                                 </Link>
                             ))}
                         </nav>
+
+                        {/* Mobile menu */}
+                        {menuOpen && (
+                            <>
+                                <div className="fixed inset-0 top-14 z-30 bg-background/60 backdrop-blur-sm md:hidden" aria-hidden="true" />
+                                <nav
+                                    className="absolute left-0 top-14 z-40 w-full border-b border-border bg-background p-4 shadow-lg md:hidden"
+                                    aria-label="Mobile navigation"
+                                >
+                                    <div className="page-container flex flex-col gap-1">
+                                        {navigation.map((item) => (
+                                            <Link
+                                                key={item.href}
+                                                href={item.href}
+                                                className={`rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${pathname === item.href
+                                                    ? "bg-accent text-accent-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                                    }`}
+                                            >
+                                                {item.label}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </nav>
+                            </>
+                        )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                         <ModeToggle />
                         <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={async () => {
-                                await logoutAction();
-                                router.replace("/login");
-                            }}
+                            onClick={handleLogout}
+                            className="gap-1.5 text-muted-foreground hover:text-foreground"
                         >
-                            Logout
+                            <LogOut className="size-3.5" />
+                            <span className="hidden sm:inline">Logout</span>
                         </Button>
                     </div>
                 </div>
-
-                {menuOpen && (
-                    <div className="md:hidden border-t border-border">
-                        <nav className="page-container py-3 flex flex-col gap-1">
-                            {navigation.map((item) => (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`rounded-md px-3 py-2 text-sm ${pathname === item.href
-                                            ? "bg-accent text-accent-foreground"
-                                            : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-                                        }`}
-                                    onClick={() => setMenuOpen(false)}
-                                >
-                                    {item.label}
-                                </Link>
-                            ))}
-                        </nav>
-                    </div>
-                )}
             </header>
 
-            <main className="page-container py-6 md:py-8">{children}</main>
+            <main id="main-content" className="page-container py-6 md:py-8">
+                {children}
+            </main>
         </div>
     );
 }

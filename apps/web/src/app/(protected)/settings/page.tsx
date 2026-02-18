@@ -1,60 +1,157 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Monitor, Moon, Sun, User } from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@ui/alert-dialog";
 import { Button } from "@ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@ui/card";
-import { ModeToggle } from "@components/mode-toggle";
+import { Separator } from "@ui/separator";
+import { Skeleton } from "@ui/skeleton";
 import { useAuthStore } from "@lib/auth/auth-store";
+import { useRouteAuthGuard } from "@lib/auth/use-route-auth-guard";
+
+const themes = [
+    { value: "light", label: "Light", icon: Sun },
+    { value: "dark", label: "Dark", icon: Moon },
+    { value: "system", label: "System", icon: Monitor },
+] as const;
 
 export default function SettingsPage() {
     const router = useRouter();
+    const { theme, setTheme } = useTheme();
+    const { isLoading, canAccess } = useRouteAuthGuard("protected");
     const user = useAuthStore((state) => state.user);
     const revokeAllAction = useAuthStore((state) => state.revokeAllAction);
+    const [isRevoking, setIsRevoking] = useState(false);
+
+    async function handleRevoke() {
+        setIsRevoking(true);
+        try {
+            await revokeAllAction();
+            router.replace("/login");
+        } finally {
+            setIsRevoking(false);
+        }
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-[50vh] items-center justify-center">
+                <div className="space-y-2 text-center">
+                    <Skeleton className="mx-auto h-4 w-28" />
+                    <Skeleton className="mx-auto h-3 w-16" />
+                </div>
+            </div>
+        );
+    }
+
+    if (!canAccess) {
+        return null;
+    }
 
     return (
-        <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Profile</CardTitle>
-                    <CardDescription>Account identity synced from auth session.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                    <p>
-                        <span className="font-medium">Name:</span> {user?.name ?? "Authenticated User"}
-                    </p>
-                    <p>
-                        <span className="font-medium">Email:</span> {user?.email ?? "Hidden in cookie-only session"}
-                    </p>
-                </CardContent>
-            </Card>
+        <div className="max-w-lg space-y-8">
+            <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Theme</CardTitle>
-                    <CardDescription>Switch appearance based on your workflow preference.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <ModeToggle />
-                </CardContent>
-            </Card>
+            {/* Profile section */}
+            <section className="space-y-4">
+                <div>
+                    <h2 className="text-sm font-medium">Profile</h2>
+                    <p className="text-xs text-muted-foreground">Your account information.</p>
+                </div>
+                <div className="surface p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                            <User className="size-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">
+                                {user?.name ?? "Authenticated User"}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                                {user?.email ?? "Email hidden"}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-            <Card className="lg:col-span-2">
-                <CardHeader>
-                    <CardTitle>Session Controls</CardTitle>
-                    <CardDescription>Revoke all active sessions and force re-authentication.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button
-                        variant="destructive"
-                        onClick={async () => {
-                            await revokeAllAction();
-                            router.replace("/login");
-                        }}
-                    >
-                        Revoke all sessions
-                    </Button>
-                </CardContent>
-            </Card>
+            <Separator />
+
+            {/* Appearance section */}
+            <section className="space-y-4">
+                <div>
+                    <h2 className="text-sm font-medium">Appearance</h2>
+                    <p className="text-xs text-muted-foreground">Choose your preferred color theme.</p>
+                </div>
+                <div
+                    className="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5"
+                    role="radiogroup"
+                    aria-label="Theme selection"
+                >
+                    {themes.map(({ value, label, icon: Icon }) => (
+                        <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={theme === value}
+                            onClick={() => setTheme(value)}
+                            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${theme === value
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                                }`}
+                        >
+                            <Icon className="size-3.5" />
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            <Separator />
+
+            {/* Session controls */}
+            <section className="space-y-4">
+                <div>
+                    <h2 className="text-sm font-medium">Session controls</h2>
+                    <p className="text-xs text-muted-foreground">Manage your active sessions across devices.</p>
+                </div>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm" disabled={isRevoking}>
+                            {isRevoking ? "Revoking..." : "Revoke all sessions"}
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Revoke all sessions</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will sign you out on all devices, including this one. You will need to sign in again.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={handleRevoke}
+                                className="bg-destructive text-white hover:bg-destructive/90"
+                            >
+                                Revoke all
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </section>
         </div>
     );
 }

@@ -31,7 +31,9 @@ export async function login(payload: LoginPayload) {
 }
 
 export async function refreshSession() {
-  await apiClient.post<ApiEnvelope<{ ok: boolean }>>("/auth/refresh");
+  const response =
+    await apiClient.post<ApiEnvelope<AuthUserResponse>>("/auth/refresh");
+  return response.data.data.user;
 }
 
 export async function logoutSession() {

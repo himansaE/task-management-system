@@ -6,6 +6,7 @@ import {
   ListTasksQueryInput,
   UpdateTaskInput,
 } from "@repo/contract";
+import { toast } from "sonner";
 import {
   createTask,
   deleteTask,
@@ -18,10 +19,11 @@ import { queryKeys } from "./keys";
 
 type TasksPageData = ApiPaginatedEnvelope<Task[]>;
 
-export function useTasksQuery(params: ListTasksQueryInput) {
+export function useTasksQuery(params: ListTasksQueryInput, enabled = true) {
   return useQuery({
     queryKey: queryKeys.tasks(params),
     queryFn: () => listTasks(params),
+    enabled,
   });
 }
 
@@ -66,12 +68,15 @@ export function useCreateTaskMutation(params: ListTasksQueryInput) {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.tasks(params), context.previous);
       }
-      normalizeApiError(error);
+      toast.error(normalizeApiError(error).message);
     },
     onSettled: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.tasks(params),
       });
+    },
+    onSuccess: () => {
+      toast.success("Task created");
     },
   });
 }
@@ -113,12 +118,15 @@ export function useUpdateTaskMutation(params: ListTasksQueryInput) {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.tasks(params), context.previous);
       }
-      normalizeApiError(error);
+      toast.error(normalizeApiError(error).message);
     },
     onSettled: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.tasks(params),
       });
+    },
+    onSuccess: () => {
+      toast.success("Task updated");
     },
   });
 }
@@ -151,12 +159,15 @@ export function useDeleteTaskMutation(params: ListTasksQueryInput) {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.tasks(params), context.previous);
       }
-      normalizeApiError(error);
+      toast.error(normalizeApiError(error).message);
     },
     onSettled: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.tasks(params),
       });
+    },
+    onSuccess: () => {
+      toast.success("Task deleted");
     },
   });
 }

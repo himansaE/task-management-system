@@ -46,7 +46,7 @@ Associate Software Engineer assessment.
 - Backend is implemented for auth + task CRUD with secure cookie auth, session records, and ownership checks.
 - API success responses use a standardized envelope: `{"data": ...}` and list endpoints include `meta`.
 - `GET /tasks` supports `status`, `priority`, `page`, and `limit` query parameters.
-- Frontend in `apps/web` includes login/register pages, protected routes, and auth bootstrap/session handling.
+- Frontend in `apps/web` includes login/register pages, protected routes, task CRUD UI, auth bootstrap, automatic token refresh, and network error recovery.
 
 ## API Documentation
 
@@ -80,9 +80,14 @@ Why this default:
 
 - JWT in `HttpOnly` cookies with environment-aware policy (`Lax` local dev, `None` in production for cross-site)
 - Session-based refresh token rotation with per-session logout and global revoke support
+- Lightweight session-check endpoint for page-load auth bootstrap — no token rotation or unnecessary DB writes
+- Automatic access token refresh in the HTTP client with single-flight queuing; only forces logout when the refresh itself is rejected
+- Transient network failures surface a recoverable error state rather than triggering a spurious logout
+- JWT secrets required at startup — missing configuration fails fast with no weak-default fallback
+- Rate-limiter per-user buckets use only server-verified identity
 - Argon2id password hashing
 - Global validation/sanitization via Zod + pipes
-- Rate limiting + secure headers (Helmet)
+- Secure headers (Helmet)
 
 ## Deliverables Reference
 
@@ -96,10 +101,11 @@ Why this default:
 - Architecture and security planning: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ### Phase 2 — Implementation & Deployment 
-- Frontend: login/register, protected dashboard shell, task flows, route protection, and cookie-based auth bootstrap
+- Frontend: login/register, protected routes, task CRUD UI, auth bootstrap, automatic token refresh, and network error recovery
 - Backend endpoints:
    - `POST /auth/register`
    - `POST /auth/login`
+   - `GET /auth/me`
    - `POST /auth/refresh`
    - `POST /auth/logout`
    - `POST /auth/revoke`
@@ -107,10 +113,6 @@ Why this default:
    - `POST /tasks`
    - `PUT /tasks/:id`
    - `DELETE /tasks/:id`
-- Security: secure token storage, password hashing, rate limiting, validation/sanitization, authorization by ownership, safe error handling
+- Security: secure token storage, password hashing, rate limiting, validation/sanitization, authorization by ownership, safe error handling, fail-fast secret configuration
 - Deployment: backend + database active; frontend and CI automation follow the frontend/deployment phase
 
-### Phase 3 — Review
-- Explain architecture decisions, trade-offs, and scaling considerations
-- Demonstrate live deployment and key security decisions
-- Walk through code organization and ownership boundaries

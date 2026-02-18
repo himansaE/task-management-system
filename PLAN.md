@@ -16,27 +16,31 @@ Drizzle is selected as the “better tech choice” over heavier ORM options bec
 
 **Repository pattern:** Turborepo monorepo with pnpm.
 
-- `apps/web`: Next.js 14 (App Router) frontend.
+- `apps/web`: Next.js 16 (App Router) frontend.
 - `apps/api`: NestJS backend.
 - `packages/contract`: shared Zod schemas and inferred types (single source of truth for FE/BE contracts).
 - `packages/database`: Drizzle schema, migrations, and DB client.
 
-Frontend integration (Axios + TanStack Query) is active for auth and protected-route bootstrap flows, while remaining task UX improvements are incremental. Backend is organized by domain modules (`auth`, `tasks`) and enforces ownership in every task query (`WHERE user_id = current_user`).
+Frontend uses Axios + TanStack Query for all API communication. Auth state is managed client-side with session bootstrap, automatic token refresh, and graceful error recovery for transient network failures. Backend is organized by domain modules (`auth`, `tasks`) and enforces ownership in every task query (`WHERE user_id = current_user`).
 UI uses shadcn/ui components with Tailwind token-based styling and a CSS-variable theme system for correct light/dark mode behavior and accessible contrast.
 
 ## 3) Security Considerations
 
 **Authentication and token storage**
 - Access and refresh JWTs are stored in `HttpOnly` cookies (not localStorage).
-- Refresh sessions are persisted server-side and rotated on each refresh.
+- A dedicated lightweight session-check endpoint allows the frontend to verify an active session on page load without rotating the refresh token, avoiding unnecessary DB writes.
+- When the access token expires, the HTTP client transparently refreshes it with a single in-flight request and retries any queued requests — no forced logout for normal expiry.
+- Transient network failures are surfaced as a recoverable error state; the user can retry without being logged out.
+- Refresh sessions are persisted server-side and rotated on each refresh call.
 - Logout revokes only the current session, while revoke-all invalidates all sessions.
+- JWT secrets are required at startup — missing configuration fails fast rather than falling back to weak defaults.
 
 **Credential and input security**
 - Password hashing with Argon2id.
 - Global request validation and sanitization using Zod + Nest validation pipe (`whitelist: true`).
 
 **API and platform hardening**
-- Rate limiting via NestJS Throttler (`5/min` auth routes, `100/min` task routes).
+- Rate limiting via NestJS Throttler (`5/min` auth routes, `100/min` task routes). Per-user buckets use only server-verified identity.
 - Helmet for secure headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options).
 - CSRF risk reduced by SameSite cookies and HttpOnly token storage.
 - Standard HTTP exceptions are returned by Nest for invalid/unauthorized flows.
@@ -58,24 +62,10 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - Better-tech choices justified (NestJS + Drizzle + Supabase, shadcn + Tailwind).
 
 **Phase 2 — Implementation & Deployment**
-- Frontend: Register/Login, protected shell routes, bootstrap refresh, and auth-state handling are implemented.
-- Backend: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/revoke`, `GET/POST/PUT/DELETE /tasks`.
-- Security: password hashing, validation/sanitization, rate limiting, secure token storage, ownership enforcement, safe error handling.
+- Frontend: register/login, protected routes, task CRUD UI, auth bootstrap, automatic token refresh, and network error recovery.
+- Backend: `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/revoke`, `GET/POST/PUT/DELETE /tasks`.
+- Security: password hashing, validation/sanitization, rate limiting, secure token storage, ownership enforcement, safe error handling, fail-fast secret configuration.
 - Deployment: backend + DB active; frontend deployment follows frontend implementation phase.
-
-### Phase 2 Progress Notes (Current)
-
-- Added Drizzle migration workflow commands at repo root (`db:generate`, `db:migrate`, `db:studio`).
-- Generated and applied initial SQL migration for `users` and `tasks` tables.
-- Added API DB health endpoint (`GET /health/db`).
-- Refined architecture boundary: shared database package provides schema/client primitives; API owns feature repositories via Nest DI.
-- Standardized environment loading for local and hosted environments using `DATABASE_URL` with local `.env` fallback.
-- Standardized API success envelopes to `{ data }` and `{ data, meta }` for paginated task lists.
-- Added task list query support: `status`, `priority`, `page`, `limit`.
-- Added task `status` support to create/update payloads.
-- Enforced owner-scoped update/delete directly at query level.
-- Updated logout flow to revoke sessions and clear auth cookies.
-- Added session-backed auth flow for concurrent sessions, refresh rotation, current-session logout, and global revoke-all behavior.
 
 **Phase 3 — Review & Walkthrough**
 - Code walkthrough with architecture and tradeoff explanations.
@@ -87,5 +77,5 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - All required endpoints implemented.
 - Users can only access and modify their own tasks.
 - Auth token is stored securely in HttpOnly cookie with revocation support.
-- Frontend UX is deferred to the next phase.
+- Frontend covers full task CRUD, protected routes, and auth flows with error recovery.
 - Repository includes: clear commit history, `PLAN.md`, `README.md`, `.env.example`, and live URL.

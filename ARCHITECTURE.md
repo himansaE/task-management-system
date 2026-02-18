@@ -2,7 +2,7 @@
 
 > Internal reference document. Not a deliverable — complements the 1-page [PLAN.md](PLAN.md).
 
-> Implementation status (February 2026): backend and core frontend auth/protected-route flows are active.
+> Implementation status (February 2026): backend and frontend are fully active — auth, protected routes, task CRUD, and session management are all implemented.
 
 ---
 
@@ -45,7 +45,7 @@ flowchart LR
 | **Monorepo** | Turborepo + pnpm | Cached builds, shared `tsconfig`/`eslint`, strict package boundaries. pnpm's strict node_modules prevents phantom deps. |
 | **Frontend** | Next.js (App Router) | Active for auth + protected-route flows. Remaining task UX improvements continue iteratively. |
 | **UI** | Tailwind CSS + Shadcn/ui | shadcn component primitives with Tailwind token-based styling. Theme values come from semantic CSS variables and are switched by a theme provider for correct light/dark modes without hardcoded colors. |
-| **HTTP Client** | Axios | Response interceptors enable global 401 handling (auto-redirect to login) and consistent error mapping. `credentials: 'include'` auto-sends cookies. `fetch` lacks interceptors without wrapper boilerplate. |
+| **HTTP Client** | Axios | Response interceptors handle 401s with single-flight token refresh and request retry queuing — concurrent requests recover transparently after token expiry. Only forces logout when the refresh itself is rejected. Transient network failures surface a recoverable error state. `fetch` lacks interceptors without wrapper boilerplate. |
 | **State Mgmt** | TanStack Query | Server-state solution: handles `isLoading`, `isError`, `data`, cache invalidation, and optimistic updates. Dehydrate/hydrate pattern enables SSR → client handoff with zero loading flicker. Replaces manual `useEffect` patterns. |
 | **Form Validation** | react-hook-form + Zod | Shares Zod schemas from `packages/contract`. Validation runs client-side before submission AND server-side via NestJS pipes — same rules, zero drift. |
 | **Backend** | NestJS + Express | DI container enforces separation of concerns. Built-in support for Guards, Pipes, Interceptors, and Filters provides clean middleware layering without ad-hoc chains. |
@@ -80,6 +80,12 @@ auth_sessions: { id, user_id, refresh_token_hash, expires_at, revoked_at }
 3. Tokens are placed in HttpOnly cookies (`access_token`, `refresh_token`) with environment-aware SameSite policy.
 4. Browser stores cookie — JavaScript cannot read it (`HttpOnly`).
 
+**Bootstrap Flow (Frontend):**
+1. On page load the client calls `GET /auth/me` using the existing access token cookie — verifies the JWT and active session with no DB mutation.
+2. On success → user is authenticated; no token rotation occurs.
+3. On 401 (expired access token) → falls back to `POST /auth/refresh` to rotate the session and reissue tokens.
+4. On network failure at either step → auth state moves to a recoverable error state; the user sees a retry UI and is not logged out.
+
 **Request Authentication:**
 1. `JwtAuthGuard` extracts token from cookie header.
 2. Verifies JWT signature and expiry.
@@ -100,7 +106,7 @@ auth_sessions: { id, user_id, refresh_token_hash, expires_at, revoked_at }
 | `Secure` | `true` | Cookie only sent over HTTPS → prevents MITM interception |
 | `SameSite` | `Lax` (local dev) / `None` (production cross-site) | Allows cross-site deployment while preserving secure defaults |
 | `Path` | `/` | Cookie available to all API routes |
-| `Max-Age` | `86400` (24h) | Token expiry aligned with JWT `exp` claim |
+| `Max-Age` | `900` (access) / `604800` (refresh) | Aligned with JWT `exp` claims: 15-minute access token, 7-day refresh token |
 
 ### 3.3 Defense-in-Depth Layers
 
@@ -110,7 +116,7 @@ auth_sessions: { id, user_id, refresh_token_hash, expires_at, revoked_at }
 | **Authentication** | JWT + Session Records | Session hijacking, stale tokens |
 | **Authorization** | Ownership check in every task query (`WHERE user_id = $1`) | Horizontal privilege escalation |
 | **Input** | Zod schema validation + `whitelist: true` (strip unknown fields) | Injection, mass assignment |
-| **Rate Limiting** | ThrottlerModule: 5/min auth, 100/min data | Brute-force, credential stuffing, DoS |
+| **Rate Limiting** | ThrottlerModule: 5/min auth, 100/min data. Per-user buckets use only server-verified identity; unauthenticated requests are tracked by IP. | Brute-force, credential stuffing, DoS, throttle-bucket spoofing |
 | **Headers** | Helmet: CSP, HSTS, X-Frame-Options, X-Content-Type-Options | XSS, clickjacking, MIME sniffing |
 | **Errors** | Global `AllExceptionsFilter` → standard response shape | Stack trace leaks, information disclosure |
 | **Passwords** | Argon2id (memory: 64MB, iterations: 3, parallelism: 1) | Offline cracking |
@@ -190,6 +196,7 @@ Every API response follows a predictable shape. The frontend never needs to gues
 |---|---|---|---|
 | `POST` | `/auth/register` | Public | Create account and issue auth cookies. Returns user payload. |
 | `POST` | `/auth/login` | Public | Validate credentials, create new auth session, set HttpOnly access/refresh cookies. |
+| `GET` | `/auth/me` | Cookie | Return current session user from the access token. Lightweight session check — no DB write or token rotation. |
 | `POST` | `/auth/refresh` | Cookie | Rotate refresh token for current session and reissue access/refresh cookies. |
 | `POST` | `/auth/logout` | Cookie | Revoke current session and clear auth cookies. |
 | `POST` | `/auth/revoke` | Cookie | Revoke all sessions and clear auth cookies. |
@@ -360,13 +367,13 @@ pnpm dev  # Turborepo runs apps/web + apps/api concurrently
 
 ### 8.2 API Documentation
 
-**Swagger/OpenAPI** is generated from NestJS Swagger decorators and served at `http://localhost:3000/api/docs` in development. It acts as the live API reference without manual YAML maintenance.
+**Swagger/OpenAPI** is generated from NestJS Swagger decorators and served at `http://localhost:3001/api/docs` in development. It acts as the live API reference without manual YAML maintenance.
 
 ### 8.3 Configuration
 
 - API startup loads `.env` from current working directory first, then root fallback.
 - Database tooling prefers host-provided `DATABASE_URL` and falls back to repo `.env` for local runs.
-- `PORT` defaults to `3000` when unset.
+- `PORT` defaults to `3001` when unset.
 
 ### 8.4 Health Check
 

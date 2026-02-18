@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "@ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
 } from "@ui/card";
 import { Input } from "@ui/input";
 import { Label } from "@ui/label";
@@ -19,117 +19,117 @@ import { useRouteAuthGuard } from "@lib/auth/use-route-auth-guard";
 import { NetworkError } from "@components/network-error";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { isLoading, canAccess, isError, error, retryAuth } =
-    useRouteAuthGuard("guest");
-  const loginAction = useAuthStore((state) => state.loginAction);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+    const router = useRouter();
+    const { isLoading, canAccess, isError, error, retryAuth } =
+        useRouteAuthGuard("guest");
+    const loginAction = useAuthStore((state) => state.loginAction);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFormError(null);
-    setIsSubmitting(true);
+    async function onSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setFormError(null);
+        setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
+        const formData = new FormData(event.currentTarget);
+        const email = String(formData.get("email") ?? "").trim();
+        const password = String(formData.get("password") ?? "");
 
-    if (!email || !password) {
-      setFormError("Please fill all required fields.");
-      setIsSubmitting(false);
-      return;
+        if (!email || !password) {
+            setFormError("Please fill all required fields.");
+            setIsSubmitting(false);
+            return;
+        }
+
+        try {
+            await loginAction({ email, password });
+            router.replace("/tasks");
+        } catch (error) {
+            setFormError(error instanceof Error ? error.message : "Unable to login");
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
-    try {
-      await loginAction({ email, password });
-      router.replace("/tasks");
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Unable to login");
-    } finally {
-      setIsSubmitting(false);
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center">
+                <div className="space-y-2 text-center">
+                    <Skeleton className="mx-auto h-4 w-28" />
+                    <Skeleton className="mx-auto h-3 w-16" />
+                </div>
+            </div>
+        );
     }
-  }
 
-  if (isLoading) {
+    if (isError) {
+        return <NetworkError message={error} onRetry={retryAuth} fill="full" />;
+    }
+
+    if (!canAccess) {
+        return null;
+    }
+
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="space-y-2 text-center">
-          <Skeleton className="mx-auto h-4 w-28" />
-          <Skeleton className="mx-auto h-3 w-16" />
+        <div className="relative flex min-h-screen items-center justify-center px-4 py-10">
+            {/* Subtle background pattern */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,var(--accent)_0%,transparent_50%)] opacity-40" />
+
+            <div className="relative w-full max-w-sm space-y-6">
+                <div className="text-center">
+                    <h1 className="text-lg font-semibold tracking-tight">TaskFlow Pro</h1>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        Secure task management
+                    </p>
+                </div>
+
+                <Card>
+                    <CardHeader className="space-y-1 pb-4">
+                        <CardTitle className="text-xl">Welcome back</CardTitle>
+                        <CardDescription>
+                            Sign in to your account to continue.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form className="space-y-4" onSubmit={onSubmit}>
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Email</Label>
+                                <Input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    placeholder="you@example.com"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="password">Password</Label>
+                                <Input
+                                    id="password"
+                                    name="password"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    required
+                                />
+                            </div>
+                            {formError && <div className="error-banner">{formError}</div>}
+                            <Button className="w-full" type="submit" disabled={isSubmitting}>
+                                {isSubmitting ? "Signing in..." : "Sign in"}
+                            </Button>
+                        </form>
+                        <p className="mt-4 text-center text-xs text-muted-foreground">
+                            New here?{" "}
+                            <Link
+                                href="/register"
+                                className="text-foreground underline underline-offset-4 hover:text-primary"
+                            >
+                                Create account
+                            </Link>
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
-      </div>
     );
-  }
-
-  if (isError) {
-    return <NetworkError message={error} onRetry={retryAuth} fill="full" />;
-  }
-
-  if (!canAccess) {
-    return null;
-  }
-
-  return (
-    <div className="relative flex min-h-screen items-center justify-center px-4 py-10">
-      {/* Subtle background pattern */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,var(--accent)_0%,transparent_50%)] opacity-40" />
-
-      <div className="relative w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <h1 className="text-lg font-semibold tracking-tight">TaskFlow Pro</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Secure task management
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl">Welcome back</CardTitle>
-            <CardDescription>
-              Sign in to your account to continue.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={onSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-              {formError && <div className="error-banner">{formError}</div>}
-              <Button className="w-full" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Signing in..." : "Sign in"}
-              </Button>
-            </form>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              New here?{" "}
-              <Link
-                href="/register"
-                className="text-foreground underline underline-offset-4 hover:text-primary"
-              >
-                Create account
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
 }

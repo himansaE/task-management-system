@@ -30,8 +30,8 @@ Run from repo root:
 
 ## Health
 
-- `GET /health/db` returns `{"status":"ok"}` when database connectivity works.
-- Returns HTTP `503` when database is unavailable.
+- `GET /health/db` returns `{"data":{"status":"ok"}}` when database connectivity works.
+- On failure, returns HTTP `503` with the standard error envelope: `{"statusCode":503,"error":"Service Unavailable","message":"Database unavailable","timestamp":"<ISO>"}`.
 
 ## API Docs
 

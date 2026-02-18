@@ -21,7 +21,7 @@ Drizzle is selected as the “better tech choice” over heavier ORM options bec
 - `packages/contract`: shared Zod schemas and inferred types (single source of truth for FE/BE contracts).
 - `packages/database`: Drizzle schema, migrations, and DB client.
 
-Frontend uses Axios + TanStack Query. Axios interceptors centralize auth/error handling (e.g., 401 redirect); TanStack Query handles caching, loading/error states, and SSR hydration to avoid initial loading flicker. Backend is organized by domain modules (`auth`, `tasks`) and enforces ownership in every task query (`WHERE user_id = current_user`).
+Frontend integration (Axios + TanStack Query) is planned for the frontend phase; current `apps/web` remains scaffold-level while backend delivery is prioritized. Backend is organized by domain modules (`auth`, `tasks`) and enforces ownership in every task query (`WHERE user_id = current_user`).
 UI uses shadcn/ui components with Tailwind token-based styling and a CSS-variable theme system for correct light/dark mode behavior and accessible contrast.
 
 ## 3) Security Considerations
@@ -47,7 +47,7 @@ UI uses shadcn/ui components with Tailwind token-based styling and a CSS-variabl
 - Frontend: Vercel
 - Backend: Render (Dockerized NestJS)
 - Database: Supabase (PostgreSQL)
-- CI/CD: GitHub Actions for lint, type-check, build, and path-based deploy triggers.
+- CI/CD: planned GitHub Actions quality pipeline (`lint`, `check-types`, `build`) with deploy triggers.
 
 This plan prioritizes secure defaults, clear module boundaries, and pragmatic production-readiness while staying aligned with the assessment scope and timeline.
 

@@ -39,25 +39,25 @@ Associate Software Engineer assessment.
 
 - `GET /health/db` — checks DB connectivity and returns:
    - `200 {"data":{"status":"ok"}}` when database is reachable
-  - `503` when database is unavailable
+   - `503 {"statusCode":503,"error":"Service Unavailable","message":"Database unavailable","timestamp":"<ISO>"}` when database is unavailable
 
 ## Current Implementation Status (February 2026)
 
 - Backend is implemented for auth + task CRUD with secure cookie auth, token versioning, and ownership checks.
 - API success responses use a standardized envelope: `{"data": ...}` and list endpoints include `meta`.
 - `GET /tasks` supports `status`, `priority`, `page`, and `limit` query parameters.
-- Frontend in `apps/web` is deferred for the current phase and not yet feature-complete.
+- Frontend in `apps/web` is deferred for the current phase and remains scaffold-level.
 
 ## API Documentation
 
 - Swagger UI is available at `GET /api/docs`
 
-## CI/CD Strategy (Hybrid)
+## CI/CD Status (Current vs Planned)
 
 
-- GitHub Actions runs quality gates (`lint`, `check-types`, `build`) on PRs and main.
-- Vercel handles frontend deployment natively from Git (project root: `apps/web`).
-- Render backend deploy is triggered after quality passes (via deploy hook).
+- Current state: no root GitHub Actions workflow is committed yet.
+- Planned: quality gates (`lint`, `check-types`, `build`) on PRs and main.
+- Planned deployment: Vercel for frontend and Render deploy hook for backend after quality passes.
 
 Why this default:
 - friendly on forks
@@ -74,9 +74,7 @@ Why this default:
 
 ## Reviewer Notes
 
-- Quality pipeline always runs.
-- Deployment jobs may be skipped automatically on forks without deployment secrets.
-- This is expected behavior and prevents false CI failures during review.
+- CI/deploy workflow is documented as the target approach and can be added when deployment automation is enabled.
 
 ## Security Highlights
 
@@ -110,7 +108,7 @@ Why this default:
    - `PUT /tasks/:id`
    - `DELETE /tasks/:id`
 - Security: secure token storage, password hashing, rate limiting, validation/sanitization, authorization by ownership, safe error handling
-- Deployment: frontend + backend + database + CI quality gate
+- Deployment: backend + database active; frontend and CI automation follow the frontend/deployment phase
 
 ### Phase 3 — Review
 - Explain architecture decisions, trade-offs, and scaling considerations

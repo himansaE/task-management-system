@@ -10,7 +10,7 @@
 
 ### 1.1 Architectural Pattern
 
-**Monolithic Repository, Modular Backend.** Turborepo orchestrates a pnpm workspace containing two applications and four shared packages. The backend follows a **Modular Monolith** pattern via NestJS modules — each domain (Auth, Tasks) is a self-contained module with its own controller, service, and repository. This keeps the codebase simple for a single-developer assessment while demonstrating the structural discipline needed for team-scale systems.
+**Monolithic Repository, Modular Backend.** Turborepo orchestrates a pnpm workspace containing two applications and five shared packages. The backend follows a **Modular Monolith** pattern via NestJS modules — each domain (Auth, Tasks) is a self-contained module with its own controller, service, and repository. This keeps the codebase simple for a single-developer assessment while demonstrating the structural discipline needed for team-scale systems.
 
 ### 1.2 Data Flow
 
@@ -43,7 +43,7 @@ flowchart LR
 | Layer | Technology | Why This Over Alternatives |
 |---|---|---|
 | **Monorepo** | Turborepo + pnpm | Cached builds, shared `tsconfig`/`eslint`, strict package boundaries. pnpm's strict node_modules prevents phantom deps. |
-| **Frontend** | Next.js 14 (App Router) | Planned target for the frontend phase. Current codebase keeps backend-first delivery and defers full frontend feature implementation. |
+| **Frontend** | Next.js (App Router) | Planned target for the frontend phase. Current codebase keeps backend-first delivery and defers full frontend feature implementation. |
 | **UI** | Tailwind CSS + Shadcn/ui | shadcn component primitives with Tailwind token-based styling. Theme values come from semantic CSS variables and are switched by a theme provider for correct light/dark modes without hardcoded colors. |
 | **HTTP Client** | Axios | Response interceptors enable global 401 handling (auto-redirect to login) and consistent error mapping. `credentials: 'include'` auto-sends cookies. `fetch` lacks interceptors without wrapper boilerplate. |
 | **State Mgmt** | TanStack Query | Server-state solution: handles `isLoading`, `isError`, `data`, cache invalidation, and optimistic updates. Dehydrate/hydrate pattern enables SSR → client handoff with zero loading flicker. Replaces manual `useEffect` patterns. |
@@ -194,6 +194,7 @@ Every API response follows a predictable shape. The frontend never needs to gues
 | `POST` | `/auth/login` | Public | Validate credentials → Set HttpOnly cookie (JWT). |
 | `POST` | `/auth/refresh` | Cookie | Reissue JWT with fresh expiry. Checks `token_version`. |
 | `POST` | `/auth/logout` | Cookie | Revoke current session by incrementing `token_version`, then clear auth cookies. |
+| `POST` | `/auth/revoke` | Cookie | Revoke all user sessions by incrementing `token_version`, then clear auth cookies. |
 | `GET` | `/tasks` | Cookie | List authenticated user's tasks. Supports `?status=&priority=&page=&limit=`. |
 | `POST` | `/tasks` | Cookie | Create task. Title required; `status` supported and defaults to `TODO`. |
 | `PUT` | `/tasks/:id` | Cookie | Update task. Ownership enforced (`WHERE id = $1 AND user_id = $2`). |
@@ -227,24 +228,22 @@ flowchart LR
 
 ## 6. Monorepo File Structure
 
+Current workspace structure (February 2026):
+
 ```
 root/
-├── .github/workflows/           # CI/CD pipelines
-├── .husky/                      # Git hooks
 ├── apps/
 │   ├── web/                     # Next.js frontend
 │   │   ├── src/
-│   │   │   ├── app/             # Routing layer
-│   │   │   ├── features/        # Auth, Tasks (vertical slices)
-│   │   │   ├── components/      # Shared UI primitives
-│   │   │   ├── lib/             # Axios, query client, utils
+│   │   │   ├── app/             # Routing layer (scaffold + deferred feature routes)
+│   │   │   ├── lib/             # planned client utilities
 │   │   │   └── providers/       # App-level providers
-│   │   └── middleware.ts        # Route protection
 │   └── api/                     # NestJS backend
 │       ├── src/
-│       │   ├── modules/         # auth, tasks
+│       │   ├── auth/            # auth module
+│       │   ├── tasks/           # tasks module
 │       │   ├── common/          # guards, filters, pipes, decorators
-│       │   └── config/          # typed env config
+│       │   └── database/        # db module/service
 │
 ├── packages/
 │   ├── contract/                # shared Zod schemas + inferred types
@@ -254,7 +253,6 @@ root/
 │   └── ui/                      # shared UI components
 │
 ├── .env.example                 # template only (no secrets)
-├── docker-compose.yml           # local infra
 ├── turbo.json
 ├── pnpm-workspace.yaml
 └── package.json
@@ -278,7 +276,9 @@ root/
 
 ## 7. DevOps & CI/CD
 
-### 7.1 CI Pipeline (GitHub Actions)
+### 7.1 CI Pipeline (Planned)
+
+No root `.github/workflows` pipeline is currently committed. The following is the planned quality/deploy flow.
 
 **Strategy: Hybrid (Option A default, Option B upgrade path).**
 
@@ -350,16 +350,13 @@ jobs:
 git clone <repo> && cd task-management-system
 pnpm install
 
-# 2. Start local Postgres
-docker compose up -d
+# 2. Configure environment
+copy .env.example .env
 
 # 3. Run migrations
-pnpm --filter @repo/database migrate
+pnpm run db:migrate
 
-# 4. Seed dev data (optional)
-pnpm --filter @repo/database seed
-
-# 5. Start all apps
+# 4. Start all apps
 pnpm dev  # Turborepo runs apps/web + apps/api concurrently
 ```
 
@@ -375,7 +372,7 @@ pnpm dev  # Turborepo runs apps/web + apps/api concurrently
 
 ### 8.4 Health Check
 
-`GET /health/db` — Returns `{ data: { status: 'ok' } }` when database connectivity works, and `503` when unavailable.
+`GET /health/db` — Returns `{ data: { status: 'ok' } }` when database connectivity works, and a standard `503` error envelope (`statusCode`, `error`, `message`, `timestamp`) when unavailable.
 
 ---
 

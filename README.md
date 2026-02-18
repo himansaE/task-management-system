@@ -44,7 +44,7 @@ Associate Software Engineer assessment.
 ## CI/CD Strategy (Hybrid)
 
 
-- GitHub Actions runs quality gates (`lint`, `check-types`, `build`, `test`) on PRs and main.
+- GitHub Actions runs quality gates (`lint`, `check-types`, `build`) on PRs and main.
 - Vercel handles frontend deployment natively from Git (project root: `apps/web`).
 - Render backend deploy is triggered after quality passes (via deploy hook).
 

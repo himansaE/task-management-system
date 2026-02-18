@@ -27,7 +27,6 @@ Run from repo root:
 
 - `pnpm --filter api run lint`
 - `pnpm --filter api run check-types`
-- `pnpm --filter api run test`
 
 ## Health
 

@@ -8,7 +8,7 @@ Assessment: Twist Digital (Phase 1–3)
 
 **Selected stack:** NestJS (Fastify adapter) + Drizzle ORM + PostgreSQL (Supabase).
 
-NestJS is chosen over Express.js because it enforces module boundaries, dependency injection, and consistent separation between transport, business, and data-access logic. This improves maintainability and testability as features grow. Fastify adapter is selected for generally better throughput and lower overhead.
+NestJS is chosen over Express.js because it enforces module boundaries, dependency injection, and consistent separation between transport, business, and data-access logic. This improves maintainability as features grow. Fastify adapter is selected for generally better throughput and lower overhead.
 
 Drizzle is selected as the “better tech choice” over heavier ORM options because it keeps runtime lean, aligns closely with SQL, and provides strong TypeScript inference across schema and queries. PostgreSQL (Supabase) is selected to enforce relational integrity for user-task ownership and to use managed infrastructure suitable for rapid but production-aware delivery.
 
@@ -79,7 +79,7 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 
 ## 6) Definition of Done 
 
-- All required endpoints implemented and tested.
+- All required endpoints implemented.
 - Users can only access and modify their own tasks.
 - Auth token is stored securely in HttpOnly cookie with revocation support.
 - Frontend UX includes validation, loading/error handling, and responsive/accessibility basics.

@@ -243,7 +243,6 @@ root/
 │       │   ├── modules/         # auth, tasks
 │       │   ├── common/          # guards, filters, pipes, decorators
 │       │   └── config/          # typed env config
-│       └── test/                # integration tests
 │
 ├── packages/
 │   ├── contract/                # shared Zod schemas + inferred types
@@ -295,7 +294,6 @@ jobs:
       - turbo run lint          # ESLint across all packages
       - turbo run check-types   # tsc --noEmit across all packages
       - turbo run build         # Verify build graph passes
-      - turbo run test          # Jest unit + integration tests
 
   # Vercel deploys apps/web via Git integration.
   # Keep deploy-web disabled unless switching to strict orchestration.
@@ -327,7 +325,7 @@ jobs:
 
 ### 7.2 Commit Standards
 
-- **Conventional Commits** enforced by `commitlint`: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
+- **Conventional Commits** enforced by `commitlint`: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`.
 - **Husky** pre-commit hook: runs `lint-staged` (Prettier + ESLint on staged files only).
 - **Branch strategy:** `main` (production), `develop` (integration), feature branches (`feat/auth`, `feat/tasks`).
 
@@ -341,26 +339,9 @@ jobs:
 
 ---
 
-## 8. Testing Strategy
+## 8. Developer Experience
 
-| Type | Tool | Scope | What Gets Mocked |
-|---|---|---|---|
-| **Unit** | Jest | Services, utils, pure functions | DB client, external APIs |
-| **Integration** | Supertest | Controllers + DB (full request lifecycle) | Nothing — uses real Postgres via Docker |
-| **E2E** | Playwright | Full browser flows (login → create task → logout) | Nothing — hits deployed preview |
-
-### 8.1 Testing Priorities (Assessment Scope)
-
-1. **Auth service unit tests:** Password hashing, JWT generation, token version checking.
-2. **Task service unit tests:** CRUD logic, ownership enforcement.
-3. **Auth integration tests:** Register → Login → Access protected route → Logout.
-4. **Task integration tests:** Create → Read → Update → Delete → Verify ownership isolation.
-
----
-
-## 9. Developer Experience
-
-### 9.1 Local Development Setup
+### 8.1 Local Development Setup
 
 ```bash
 # 1. Clone and install
@@ -380,11 +361,11 @@ pnpm --filter @repo/database seed
 pnpm dev  # Turborepo runs apps/web + apps/api concurrently
 ```
 
-### 9.2 API Documentation
+### 8.2 API Documentation
 
 **Swagger/OpenAPI** auto-generated from NestJS decorators and Zod schemas. Available at `http://localhost:3001/api/docs` in development. Serves as the live contract reference — no manual YAML maintenance.
 
-### 9.3 Typed Configuration
+### 8.3 Typed Configuration
 
 ```typescript
 // apps/api/src/config/app.config.ts
@@ -399,17 +380,17 @@ const envSchema = z.object({
 // with a clear Zod error — not a cryptic "undefined" at runtime.
 ```
 
-### 9.4 Health Check
+### 8.4 Health Check
 
 `GET /health` — Returns `{ status: 'ok', db: 'connected', uptime: 12345 }`. Used by Render for liveness probes and by monitoring dashboards.
 
 ---
 
-## 10. Implementation Order
+## 9. Implementation Order
 
 | # | Task | Depends On | Estimated Effort |
 |---|---|---|---|
-| 1 | Scaffold monorepo (apps + packages) | — | 1h |
+| 1 | Scaffold monorepo (apps + packages, no test setup) | — | 1h |
 | 2 | `packages/contract`: Define Zod schemas | — | 1h |
 | 3 | `packages/database`: Drizzle schema + initial migration | #2 | 2h |
 | 4 | `apps/api`: NestJS bootstrap + AuthModule | #3 | 4h |
@@ -419,6 +400,5 @@ const envSchema = z.object({
 | 8 | `apps/web`: Auth pages (Login, Register) | #4, #7 | 3h |
 | 9 | `apps/web`: Dashboard + Task CRUD UI | #5, #7 | 4h |
 | 10 | `apps/web`: Route protection (Middleware) | #8 | 1h |
-| 11 | Integration tests | #6, #9 | 3h |
-| 12 | Deployment (Vercel + Render + Supabase) | #11 | 2h |
-| 13 | README.md + final polish | #12 | 1h |
+| 11 | Deployment (Vercel + Render + Supabase) | #10 | 2h |
+| 12 | README.md + final polish | #11 | 1h |

@@ -20,12 +20,26 @@ Associate Software Engineer assessment.
 
 1. Install dependencies:
    - `pnpm install`
-2. Start local infra (if using Dockerized DB):
-   - `docker compose up -d`
-3. Run migrations:
-   - `pnpm --filter @repo/database migrate`
+2. Create environment file:
+   - copy `.env.example` to `.env`
+   - set `DATABASE_URL` (for managed DB, use the provider host/user/password)
+3. Generate and run migrations:
+   - `pnpm run db:generate`
+   - `pnpm run db:migrate`
 4. Start development:
    - `pnpm dev`
+
+## Database Commands
+
+- `pnpm run db:generate` — generate SQL migration from Drizzle schema
+- `pnpm run db:migrate` — apply pending migrations
+- `pnpm run db:studio` — open Drizzle Studio
+
+## API Health Endpoint
+
+- `GET /health/db` — checks DB connectivity and returns:
+  - `200 {"status":"ok"}` when database is reachable
+  - `503` when database is unavailable
 
 ## CI/CD Strategy (Hybrid)
 

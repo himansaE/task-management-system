@@ -267,6 +267,10 @@ root/
 
 **Isolated database package:** Migrations run independently of the NestJS build. In CI, `pnpm --filter @repo/database migrate` runs before the API build. This prevents a bad migration from blocking the entire pipeline.
 
+**Runtime/package boundary:** `packages/database` exports database primitives (schema + client factory). Domain repositories live in `apps/api` feature modules (`auth.repository`, `tasks.repository`) and are injected via Nest DI. This keeps business-specific data access in the backend service boundary.
+
+**Environment loading:** Database tooling prefers host-provided `DATABASE_URL` and falls back to repo `.env` for local development. API startup loads environment files deterministically for both root and app working directories.
+
 **Shared contract package:** The `packages/contract` package is the authoritative source for all request/response shapes. Both `apps/web` and `apps/api` depend on it. If a schema changes, TypeScript compilation fails in both consumers immediately — no runtime surprises.
 
 ---

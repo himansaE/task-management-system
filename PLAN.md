@@ -64,6 +64,14 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - Security: password hashing, validation/sanitization, rate limiting, secure token storage, ownership enforcement, safe error handling.
 - Deployment: live frontend + backend + DB with CI quality gate.
 
+### Phase 2 Progress Notes (Current)
+
+- Added Drizzle migration workflow commands at repo root (`db:generate`, `db:migrate`, `db:studio`).
+- Generated and applied initial SQL migration for `users` and `tasks` tables.
+- Added API DB health endpoint (`GET /health/db`).
+- Refined architecture boundary: shared database package provides schema/client primitives; API owns feature repositories via Nest DI.
+- Standardized environment loading for local and hosted environments using `DATABASE_URL` with local `.env` fallback.
+
 **Phase 3 — Review & Walkthrough**
 - Code walkthrough with architecture and tradeoff explanations.
 - Demonstrate deployed app and key security controls.

@@ -8,12 +8,14 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { createTaskSchema, updateTaskSchema } from '@repo/contract';
 import { CurrentUserId } from '../common/request-user.decorator';
 import { parseWithZod } from '../common/zod-parse';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TasksService } from './tasks.service';
 
+@Throttle({ default: { limit: 100, ttl: 60_000 } })
 @Controller('tasks')
 @UseGuards(JwtAuthGuard)
 export class TasksController {

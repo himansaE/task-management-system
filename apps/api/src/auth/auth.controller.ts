@@ -9,6 +9,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { loginSchema, registerSchema } from '@repo/contract';
 import { CurrentUserId } from '../common/request-user.decorator';
@@ -22,6 +23,7 @@ import {
 } from './auth.constants';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
+@Throttle({ default: { limit: 5, ttl: 60_000 } })
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

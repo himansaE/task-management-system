@@ -26,7 +26,11 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  private applyAuthCookies(response: Response, accessToken: string, refreshToken: string) {
+  private applyAuthCookies(
+    response: Response,
+    accessToken: string,
+    refreshToken: string,
+  ) {
     const secure = process.env.NODE_ENV === 'production';
 
     response.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
@@ -52,7 +56,10 @@ export class AuthController {
   }
 
   @Post('register')
-  async register(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+  async register(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const payload = parseWithZod(registerSchema, body);
     const result = await this.authService.register(payload);
     this.applyAuthCookies(response, result.accessToken, result.refreshToken);
@@ -63,7 +70,10 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+  async login(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const payload = parseWithZod(loginSchema, body);
     const result = await this.authService.login(payload);
     this.applyAuthCookies(response, result.accessToken, result.refreshToken);

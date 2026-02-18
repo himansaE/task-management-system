@@ -3,13 +3,24 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { LoginInput, RegisterInput } from '@repo/contract';
-import { createHash } from 'node:crypto';
+import * as argon2 from 'argon2';
 import { AuthRepository, AuthUserRecord } from './auth.repository';
+import {
+  ACCESS_TOKEN_SECRET,
+  ACCESS_TOKEN_TTL_SECONDS,
+  JwtTokenPayload,
+  REFRESH_TOKEN_SECRET,
+  REFRESH_TOKEN_TTL_SECONDS,
+} from './auth.constants';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly authRepository: AuthRepository) {}
+  constructor(
+    private readonly authRepository: AuthRepository,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async register(input: RegisterInput) {
     const normalizedEmail = input.email.trim().toLowerCase();
@@ -23,14 +34,15 @@ export class AuthService {
     const user = await this.authRepository.create({
       email: normalizedEmail,
       name: input.name.trim(),
-      passwordHash: this.hashPassword(input.password),
+      passwordHash: await this.hashPassword(input.password),
       tokenVersion: 1,
     });
 
+    const tokens = await this.issueTokens(user.id, user.tokenVersion);
+
     return {
       user: this.publicUser(user),
-      accessToken: this.makeAccessToken(user.id, user.tokenVersion),
-      refreshToken: this.makeRefreshToken(user.id, user.tokenVersion),
+      ...tokens,
     };
   }
 
@@ -38,7 +50,7 @@ export class AuthService {
     const normalizedEmail = input.email.trim().toLowerCase();
     const user = await this.authRepository.findByEmail(normalizedEmail);
 
-    if (!user || user.passwordHash !== this.hashPassword(input.password)) {
+    if (!user || !(await argon2.verify(user.passwordHash, input.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -53,32 +65,35 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const tokens = await this.issueTokens(
+      persistedUser.id,
+      persistedUser.tokenVersion,
+    );
+
     return {
       user: this.publicUser(persistedUser),
-      accessToken: this.makeAccessToken(
-        persistedUser.id,
-        persistedUser.tokenVersion,
-      ),
-      refreshToken: this.makeRefreshToken(
-        persistedUser.id,
-        persistedUser.tokenVersion,
-      ),
+      ...tokens,
     };
   }
 
-  async refresh(userId: string, refreshToken: string) {
-    const user = await this.authRepository.findById(userId);
+  async refresh(refreshToken: string) {
+    let payload: JwtTokenPayload;
 
-    if (!user) {
+    try {
+      payload = await this.jwtService.verifyAsync<JwtTokenPayload>(refreshToken, {
+        secret: REFRESH_TOKEN_SECRET,
+      });
+    } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const expectedRefreshToken = this.makeRefreshToken(
-      user.id,
-      user.tokenVersion,
-    );
+    if (payload.typ !== 'refresh') {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
-    if (refreshToken !== expectedRefreshToken) {
+    const user = await this.authRepository.findById(payload.sub);
+
+    if (!user || user.tokenVersion !== payload.v) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -93,28 +108,55 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    const tokens = await this.issueTokens(
+      refreshedUser.id,
+      refreshedUser.tokenVersion,
+    );
+
     return {
-      accessToken: this.makeAccessToken(
-        refreshedUser.id,
-        refreshedUser.tokenVersion,
-      ),
-      refreshToken: this.makeRefreshToken(
-        refreshedUser.id,
-        refreshedUser.tokenVersion,
-      ),
+      ...tokens,
     };
   }
 
-  private hashPassword(password: string) {
-    return createHash('sha256').update(password).digest('hex');
+  async revokeAll(userId: string) {
+    const user = await this.authRepository.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    await this.authRepository.updateTokenVersion(user.id, user.tokenVersion + 1);
   }
 
-  private makeAccessToken(userId: string, tokenVersion: number) {
-    return `dev-token-${userId}-${tokenVersion}`;
+  private async hashPassword(password: string) {
+    return argon2.hash(password, {
+      type: argon2.argon2id,
+    });
   }
 
-  private makeRefreshToken(userId: string, tokenVersion: number) {
-    return `dev-refresh-${userId}-${tokenVersion}`;
+  private issueTokens(userId: string, tokenVersion: number) {
+    const accessPayload: JwtTokenPayload = {
+      sub: userId,
+      v: tokenVersion,
+      typ: 'access',
+    };
+
+    const refreshPayload: JwtTokenPayload = {
+      sub: userId,
+      v: tokenVersion,
+      typ: 'refresh',
+    };
+
+    return Promise.all([
+      this.jwtService.signAsync(accessPayload, {
+        secret: ACCESS_TOKEN_SECRET,
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      }),
+      this.jwtService.signAsync(refreshPayload, {
+        secret: REFRESH_TOKEN_SECRET,
+        expiresIn: REFRESH_TOKEN_TTL_SECONDS,
+      }),
+    ]).then(([accessToken, refreshToken]) => ({ accessToken, refreshToken }));
   }
 
   private publicUser(user: AuthUserRecord) {

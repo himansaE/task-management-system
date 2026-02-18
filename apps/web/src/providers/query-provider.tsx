@@ -5,7 +5,9 @@ import { useState } from "react";
 import { createQueryClient } from "@lib/query/query-client";
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
-    const [queryClient] = useState(() => createQueryClient());
+  const [queryClient] = useState(() => createQueryClient());
 
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
 }

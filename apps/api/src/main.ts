@@ -24,6 +24,10 @@ async function bootstrap() {
   const { AppModule } = await import('./app.module.js');
   const app = await NestFactory.create(AppModule);
 
+  if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
+    throw new Error('CORS_ORIGIN is required in production');
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     type SwaggerApp = Parameters<typeof SwaggerModule.createDocument>[0];
     const swaggerApp = app as SwaggerApp;
@@ -65,19 +69,26 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
 
+  const normalizeOrigin = (value: string) => value.trim().replace(/\/+$/, '');
+
   const corsOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
     .split(',')
-    .map((origin) => origin.trim())
+    .map(normalizeOrigin)
     .filter((origin) => origin.length > 0);
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || corsOrigins.includes(origin)) {
+      if (!origin) {
         callback(null, true);
         return;
       }
 
-      callback(new Error('Origin not allowed by CORS'));
+      if (corsOrigins.includes(normalizeOrigin(origin))) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, false);
     },
     credentials: true,
   });

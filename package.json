@@ -5,8 +5,11 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "check-types": "turbo run check-types",
+    "db:generate": "pnpm --filter @repo/database run generate",
+    "db:migrate": "pnpm --filter @repo/database run migrate",
+    "db:studio": "pnpm --filter @repo/database run studio"
   },
   "devDependencies": {
     "prettier": "^3.7.4",

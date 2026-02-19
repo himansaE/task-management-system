@@ -29,8 +29,9 @@ async function bootstrap() {
   }
 
   if (process.env.NODE_ENV !== 'production') {
-    const swaggerApp =
-      app as unknown as Parameters<typeof SwaggerModule.createDocument>[0];
+    const swaggerApp = app as unknown as Parameters<
+      typeof SwaggerModule.createDocument
+    >[0];
 
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Task Management API')

@@ -1,8 +1,5 @@
 # PLAN.md — Task Management System
 
-Author: Associate Software Engineer Candidate  
-Date: February 2026  
-Assessment: Twist Digital (Phase 1–3)
 
 ## 1) Backend Choice and Justification
 
@@ -67,15 +64,11 @@ This plan prioritizes secure defaults, clear module boundaries, and pragmatic pr
 - Security: password hashing, validation/sanitization, rate limiting, secure token storage, ownership enforcement, safe error handling, fail-fast secret configuration.
 - Deployment: backend + DB active; frontend deployment follows frontend implementation phase.
 
-**Phase 3 — Review & Walkthrough**
-- Code walkthrough with architecture and tradeoff explanations.
-- Demonstrate deployed app and key security controls.
-- Explain decisions clearly against rubric (Security, Code Quality, UI/UX, Deployment, Soft Skills).
 
 ## 6) Definition of Done 
 
 - All required endpoints implemented.
+- Fully responsive UI with desktop and mobile screen support(Resize the window to chack)
 - Users can only access and modify their own tasks.
 - Auth token is stored securely in HttpOnly cookie with revocation support.
 - Frontend covers full task CRUD, protected routes, and auth flows with error recovery.
-- Repository includes: clear commit history, `PLAN.md`, `README.md`, `.env.example`, and live URL.

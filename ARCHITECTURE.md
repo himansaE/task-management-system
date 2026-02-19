@@ -1,8 +1,8 @@
 # Architecture Document — Task Management System
 
-> Internal reference document. Not a deliverable — complements the 1-page [PLAN.md](PLAN.md).
+> Internal reference document. for [PLAN.md](PLAN.md).
 
-> Implementation status (February 2026): backend and frontend are fully active — auth, protected routes, task CRUD, and session management are all implemented.
+> Implementation status: backend and frontend are fully active — auth, protected routes, task CRUD, and session management are all implemented.
 
 ---
 

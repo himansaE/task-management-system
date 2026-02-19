@@ -1,6 +1,4 @@
-# Task Management System (Assessment)
-
-Associate Software Engineer assessment.
+# Task Management System 
 
 ## Stack
 
@@ -22,7 +20,7 @@ Associate Software Engineer assessment.
    - `pnpm install`
 2. Create environment file:
    - copy `.env.example` to `.env`
-   - set `DATABASE_URL` (for managed DB, use the provider host/user/password)
+   - set env variables in `.env`
 3. Generate and run migrations:
    - `pnpm run db:generate`
    - `pnpm run db:migrate`

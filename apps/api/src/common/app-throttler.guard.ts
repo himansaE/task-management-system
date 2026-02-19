@@ -4,13 +4,16 @@ import type { Request } from 'express';
 
 @Injectable()
 export class AppThrottlerGuard extends ThrottlerGuard {
-  protected async getTracker(request: Request): Promise<string> {
+  protected getTracker(request: Request): Promise<string> {
     const userId = this.extractUserId(request);
     const ipAddress = request.ip ?? request.socket?.remoteAddress ?? 'unknown';
-    const routePath = request.route?.path ?? request.path ?? request.url;
+    const routePath =
+      typeof request.path === 'string' && request.path.length > 0
+        ? request.path
+        : request.url;
     const method = request.method ?? 'UNKNOWN';
 
-    return `${userId}:${ipAddress}:${method}:${routePath}`;
+    return Promise.resolve(`${userId}:${ipAddress}:${method}:${routePath}`);
   }
 
   private extractUserId(request: Request): string {

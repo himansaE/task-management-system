@@ -29,9 +29,6 @@ async function bootstrap() {
   }
 
   if (process.env.NODE_ENV !== 'production') {
-    type SwaggerApp = Parameters<typeof SwaggerModule.createDocument>[0];
-    const swaggerApp = app as SwaggerApp;
-
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Task Management API')
       .setDescription('Auth and task management API documentation')
@@ -47,11 +44,8 @@ async function bootstrap() {
       )
       .build();
 
-    const swaggerDocument = SwaggerModule.createDocument(
-      swaggerApp,
-      swaggerConfig,
-    );
-    SwaggerModule.setup('api/docs', swaggerApp, swaggerDocument, {
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, swaggerDocument, {
       swaggerOptions: {
         persistAuthorization: true,
       },
@@ -77,7 +71,10 @@ async function bootstrap() {
     .filter((origin) => origin.length > 0);
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       if (!origin) {
         callback(null, true);
         return;
@@ -95,4 +92,4 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? process.env.API_PORT ?? 3000);
 }
-bootstrap();
+void bootstrap();

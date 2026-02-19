@@ -23,6 +23,6 @@
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:^",
-    "eslint": "^10.0.0"
+    "eslint": "^9.39.1"
   }
 }

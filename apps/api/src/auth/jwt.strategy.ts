@@ -12,9 +12,19 @@ import { AuthRepository } from './auth.repository';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly authRepository: AuthRepository) {
+    const extractAccessToken = (request?: Request): string | null => {
+      if (!request) {
+        return null;
+      }
+
+      const cookies = request.cookies as Record<string, unknown> | undefined;
+      const token = cookies?.[ACCESS_TOKEN_COOKIE];
+
+      return typeof token === 'string' ? token : null;
+    };
+
     super({
-      jwtFromRequest: (request: Request) =>
-        request?.cookies?.[ACCESS_TOKEN_COOKIE] ?? null,
+      jwtFromRequest: extractAccessToken,
       ignoreExpiration: false,
       secretOrKey: ACCESS_TOKEN_SECRET,
     });

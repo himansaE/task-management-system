@@ -29,6 +29,9 @@ async function bootstrap() {
   }
 
   if (process.env.NODE_ENV !== 'production') {
+    const swaggerApp =
+      app as unknown as Parameters<typeof SwaggerModule.createDocument>[0];
+
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Task Management API')
       .setDescription('Auth and task management API documentation')
@@ -44,8 +47,11 @@ async function bootstrap() {
       )
       .build();
 
-    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('api/docs', app, swaggerDocument, {
+    const swaggerDocument = SwaggerModule.createDocument(
+      swaggerApp,
+      swaggerConfig,
+    );
+    SwaggerModule.setup('api/docs', swaggerApp, swaggerDocument, {
       swaggerOptions: {
         persistAuthorization: true,
       },

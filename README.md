@@ -48,29 +48,64 @@ Associate Software Engineer assessment.
 - `GET /tasks` supports `status`, `priority`, `page`, and `limit` query parameters.
 - Frontend in `apps/web` includes login/register pages, protected routes, task CRUD UI, auth bootstrap, automatic token refresh, and network error recovery.
 
+## Deployment Guide
+
+### 1. Database (Supabase)
+- Create a new project on Supabase.
+- Get the connection string (Transaction Mode for IPv4, or Session Mode) -> `DATABASE_URL`.
+- Run migrations locally or via CI:
+  ```bash
+  pnpm run db:migrate
+  ```
+
+### 2. Backend (Render)
+- Create a new **Web Service** on Render.
+- Connect your GitHub repository.
+- **Root Directory**: `.` (leave empty).
+- **Runtime**: `Docker`.
+- **Dockerfile Path**: `apps/api/Dockerfile`.
+- **Environment Variables**:
+  - `DATABASE_URL`: from Supabase
+  - `JWT_ACCESS_SECRET`: generate a strong secret
+  - `JWT_REFRESH_SECRET`: generate a strong secret
+  - `CORS_ORIGIN`: Your frontend URL (e.g., `https://task-management-app.vercel.app`)
+  - `NODE_ENV`: `production`
+   - Do **not** set `API_PORT` in Render; Render injects `PORT` automatically and the app uses it in production.
+
+### 3. Frontend (Vercel)
+- Import the project into Vercel.
+- **Root Directory**: `apps/web`.
+- **Framework Preset**: Next.js (automatic).
+- **Environment Variables**:
+  - `NEXT_PUBLIC_API_URL`: Your Render backend URL (e.g., `https://task-management-api.onrender.com`)
+- Deploy!
+
 ## API Documentation
 
-- Swagger UI is available at `GET /api/docs`
+- Swagger UI is available at `/api/docs` on your backend URL.
 
-## CI/CD Status (Current vs Planned)
+## CI/CD (GitHub Actions)
 
+- Workflow file: `.github/workflows/ci-cd.yml`
+- Quality gates run on PRs and pushes to `main`:
+   - `pnpm run lint`
+   - `pnpm run check-types`
+   - `pnpm run build`
+- Deploys run only on push to `main` and only when secrets exist:
+   - Backend (Render): `RENDER_DEPLOY_HOOK`
+   - Frontend (Vercel): `VERCEL_DEPLOY_HOOK`
+- Deploy jobs are path-aware:
+   - Backend deploy runs only when backend/shared-backend paths change.
+   - Frontend deploy runs only when frontend/shared-frontend paths change.
 
-- Current state: no root GitHub Actions workflow is committed yet.
-- Planned: quality gates (`lint`, `check-types`, `build`) on PRs and main.
-- Planned deployment: Vercel for frontend and Render deploy hook for backend after quality passes.
+### Required repository secrets
 
-Why this default:
-- friendly on forks
-- Minimal secret setup
+- `RENDER_DEPLOY_HOOK`: Render deploy hook URL for the backend service
+- `VERCEL_DEPLOY_HOOK`: Vercel deploy hook URL for the frontend project
 
-### Upgrade Path (Option B: Strict Orchestration)
+### Important deployment note
 
-- Move frontend deploy into GitHub Actions.
-- Gate deployment with secret checks so forks do not fail:
-  - `VERCEL_TOKEN`
-  - `VERCEL_ORG_ID`
-  - `VERCEL_PROJECT_ID`
-  - `RENDER_DEPLOY_HOOK`
+- If you use this workflow for deployments, disable auto-deploy from Git provider in Render/Vercel to avoid duplicate deployments.
 
 ## Reviewer Notes
 

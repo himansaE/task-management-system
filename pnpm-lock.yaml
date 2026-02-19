@@ -244,6 +244,15 @@ importers:
 
   packages/contract:
     dependencies:
+      '@repo/typescript-config':
+        specifier: workspace:^
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^25.2.3
+        version: 25.2.3
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -251,18 +260,9 @@ importers:
       '@repo/eslint-config':
         specifier: workspace:^
         version: link:../eslint-config
-      '@repo/typescript-config':
-        specifier: workspace:^
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^25.2.3
-        version: 25.2.3
       eslint:
         specifier: ^10.0.0
         version: 10.0.0(jiti@2.6.1)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
 
   packages/database:
     dependencies:
